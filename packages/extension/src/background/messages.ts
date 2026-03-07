@@ -6,9 +6,54 @@ import { stateManager } from './state';
 
 const LOG_PREFIX = '[onUI][background][messages]';
 const CONTENT_SCRIPT_ENTRY_FILE = 'content-script.js';
+const CONTENT_SCRIPT_PING_MESSAGE = 'ONUI_PING';
+const contentScriptInjectionInFlight = new Map<number, Promise<void>>();
 
 function isInjectableTabUrl(url?: string): boolean {
   return typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'));
+}
+
+async function isContentScriptBootstrapped(tabId: number): Promise<boolean> {
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () =>
+        (globalThis as { __ONUI_CONTENT_BOOTSTRAPPED__?: boolean }).__ONUI_CONTENT_BOOTSTRAPPED__ ===
+        true,
+    });
+    return results.some((result) => result.result === true);
+  } catch {
+    return false;
+  }
+}
+
+async function isContentScriptReachable(tabId: number): Promise<boolean> {
+  try {
+    const response = await chrome.tabs.sendMessage(tabId, {
+      type: CONTENT_SCRIPT_PING_MESSAGE,
+    } as { type: string });
+    return Boolean((response as { ok?: boolean } | undefined)?.ok);
+  } catch {
+    return false;
+  }
+}
+
+async function runWithInjectionLock(tabId: number, task: () => Promise<void>): Promise<void> {
+  const inFlight = contentScriptInjectionInFlight.get(tabId);
+  if (inFlight) {
+    await inFlight;
+    return;
+  }
+
+  const next = (async () => {
+    try {
+      await task();
+    } finally {
+      contentScriptInjectionInFlight.delete(tabId);
+    }
+  })();
+  contentScriptInjectionInFlight.set(tabId, next);
+  await next;
 }
 
 async function ensureContentScriptInjected(tabId: number): Promise<void> {
@@ -17,10 +62,24 @@ async function ensureContentScriptInjected(tabId: number): Promise<void> {
     throw new Error('onUI can only run on http/https pages.');
   }
 
-  // Inject content script only after explicit user action.
-  await chrome.scripting.executeScript({
-    target: { tabId },
-    files: [CONTENT_SCRIPT_ENTRY_FILE],
+  await runWithInjectionLock(tabId, async () => {
+    // Fast path: if content script is already responding, skip executeScript.
+    const isReachable = await isContentScriptReachable(tabId);
+    if (isReachable) {
+      return;
+    }
+
+    // Avoid duplicate executeScript() calls in the same page context.
+    const alreadyBootstrapped = await isContentScriptBootstrapped(tabId);
+    if (alreadyBootstrapped) {
+      return;
+    }
+
+    // Inject content script only after explicit user action.
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: [CONTENT_SCRIPT_ENTRY_FILE],
+    });
   });
 }
 
@@ -31,10 +90,7 @@ async function reInjectContentScriptIfEnabled(tabId: number, url?: string): Prom
   }
 
   try {
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      files: [CONTENT_SCRIPT_ENTRY_FILE],
-    });
+    await ensureContentScriptInjected(tabId);
   } catch (error) {
     console.warn(`${LOG_PREFIX} reinjection skipped`, {
       tabId,

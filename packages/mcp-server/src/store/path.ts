@@ -1,5 +1,5 @@
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 export type SupportedPlatform = 'darwin' | 'linux' | 'win32';
 export type NativeHostBrowser = 'chrome' | 'edge';
@@ -31,7 +31,19 @@ export function getDataDir(platform = process.platform): string {
   }
 }
 
+function resolveStoreFilePath(path: string): string {
+  if (path.trim().length === 0) {
+    return join(getDataDir(process.platform), 'store.v1.json');
+  }
+
+  return resolve(path);
+}
+
 export function getStorePath(platform = process.platform): string {
+  if (process.env.ONUI_STORE_PATH) {
+    return resolveStoreFilePath(process.env.ONUI_STORE_PATH);
+  }
+
   return join(getDataDir(platform), 'store.v1.json');
 }
 

@@ -2,6 +2,23 @@ import { describe, expect, it } from 'vitest';
 import { getDataDir, getNativeHostManifestPath, getNativeHostWindowsRegistryPath, getStorePath } from './path.js';
 
 describe('path resolver', () => {
+  it('respects ONUI_STORE_PATH override', () => {
+    const previous = process.env.ONUI_STORE_PATH;
+    process.env.ONUI_STORE_PATH = '/tmp/onui-store/custom.v1.json';
+
+    try {
+      expect(getStorePath('linux')).toBe('/tmp/onui-store/custom.v1.json');
+      expect(getStorePath('win32')).toBe('/tmp/onui-store/custom.v1.json');
+      expect(getStorePath('darwin')).toBe('/tmp/onui-store/custom.v1.json');
+    } finally {
+      if (previous === undefined) {
+        delete process.env.ONUI_STORE_PATH;
+      } else {
+        process.env.ONUI_STORE_PATH = previous;
+      }
+    }
+  });
+
   it('resolves darwin paths', () => {
     const dataDir = getDataDir('darwin');
     expect(dataDir).toContain('Library/Application Support/onui');

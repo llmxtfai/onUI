@@ -41,6 +41,8 @@ Optional extension ID overrides:
 - `ONUI_CHROME_EXTENSION_IDS`: comma-separated Chrome extension IDs to append.
 - `ONUI_EDGE_EXTENSION_IDS`: comma-separated Edge extension IDs to append.
 - `ONUI_EXTRA_EXTENSION_IDS`: comma-separated IDs appended for both browsers.
+- `ONUI_STORE_PATH`: absolute file path for the shared MCP annotation store
+  (useful for WSL setups where browsers run on Windows and MCP runs in Linux).
 
 ## Verify Installation
 
@@ -78,6 +80,16 @@ If you want agents to process annotations and then remove them:
 1. macOS: `~/Library/Application Support/onui/store.v1.json`
 2. Linux: `${XDG_DATA_HOME:-~/.local/share}/onui/store.v1.json`
 3. Windows: `%APPDATA%\\onui\\store.v1.json`
+
+WSL + Windows split setup:
+
+1. Find the Windows user folder in WSL (example: `/mnt/c/Users/YourWindowsUser/AppData/Roaming/onui/store.v1.json`).
+2. Set it for MCP processes started from WSL:
+   ```bash
+   export ONUI_STORE_PATH="/mnt/c/Users/YourWindowsUser/AppData/Roaming/onui/store.v1.json"
+   pnpm --filter @onui/mcp-server run doctor
+   ```
+3. Launch your agent from that same shell/session so it reads the same store file.
 
 ## Rollback
 

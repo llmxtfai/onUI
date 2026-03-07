@@ -79,6 +79,14 @@ Then load it in Chrome or Edge:
 
 Recommended path: use the same installer command above and answer `y` when prompted.
 
+If you run the MCP client from WSL while the browser and native host are on Windows, export:
+
+```bash
+export ONUI_STORE_PATH="/mnt/c/Users/<YourWindowsUser>/AppData/Roaming/onui/store.v1.json"
+```
+
+Before launching your MCP client/agent so both sides share the same annotation store.
+
 If you want to force MCP setup in non-interactive mode:
 
 macOS/Linux (`--mcp`):

@@ -1,354 +1,398 @@
-import { useState, useCallback, useEffect } from "preact/hooks";
-import type { Annotation, OutputLevel } from "@/types";
-import { generateOutput } from "../utils/output-generation";
-import { copyToClipboard } from "../utils/clipboard";
+import { useState, useCallback, useEffect } from 'preact/hooks';
+import type { Annotation, OutputLevel, RegionShape } from '@/types';
+import { generateOutput } from '../utils/output-generation';
+import { copyToClipboard } from '../utils/clipboard';
 
 // Icons
 const OnUIIcon = () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M12 2L2 7l10 5 10-5-10-5z" />
-        <path d="M2 17l10 5 10-5" />
-        <path d="M2 12l10 5 10-5" />
-    </svg>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M12 2L2 7l10 5 10-5-10-5z" />
+    <path d="M2 17l10 5 10-5" />
+    <path d="M2 12l10 5 10-5" />
+  </svg>
 );
 
 const CrosshairIcon = () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10" />
-        <line x1="22" y1="12" x2="18" y2="12" />
-        <line x1="6" y1="12" x2="2" y2="12" />
-        <line x1="12" y1="6" x2="12" y2="2" />
-        <line x1="12" y1="22" x2="12" y2="18" />
-    </svg>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <circle cx="12" cy="12" r="10" />
+    <line x1="22" y1="12" x2="18" y2="12" />
+    <line x1="6" y1="12" x2="2" y2="12" />
+    <line x1="12" y1="6" x2="12" y2="2" />
+    <line x1="12" y1="22" x2="12" y2="18" />
+  </svg>
 );
 
 const CopyIcon = () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-    </svg>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </svg>
+);
+
+const PenIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
+  </svg>
+);
+
+const RectangleIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <rect x="4" y="6" width="16" height="12" rx="1" />
+  </svg>
+);
+
+const EllipseIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <ellipse cx="12" cy="12" rx="8" ry="6" />
+  </svg>
 );
 
 const TrashIcon = () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="3,6 5,6 21,6" />
-        <path d="M19,6v14a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6m3,0V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2v2" />
-    </svg>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <polyline points="3,6 5,6 21,6" />
+    <path d="M19,6v14a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6m3,0V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2v2" />
+  </svg>
 );
 
 const SettingsIcon = () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="3" />
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </svg>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </svg>
 );
 
 const CheckIcon = () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="20,6 9,17 4,12" />
-    </svg>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <polyline points="20,6 9,17 4,12" />
+  </svg>
 );
 
 interface OnUIToolbarProps {
-    isAnnotateMode: boolean;
-    multiSelectCount: number;
-    onToggleAnnotateMode: () => void | Promise<boolean>;
-    annotations: Annotation[];
-    outputLevel: OutputLevel;
-    onOutputLevelChange: (level: OutputLevel) => void;
-    clearOnCopy: boolean;
-    onClearOnCopyChange: (enabled: boolean) => void;
-    onClearAnnotations: () => void | Promise<void>;
-    onComplete: () => void | Promise<void>;
-    onError?: (message: string) => void;
+  isAnnotateMode: boolean;
+  isDrawMode: boolean;
+  drawShape: RegionShape;
+  multiSelectCount: number;
+  onToggleAnnotateMode: () => void | Promise<boolean>;
+  onToggleDrawMode: () => void;
+  onSelectDrawShape: (shape: RegionShape) => void;
+  onEscape: () => void;
+  annotations: Annotation[];
+  outputLevel: OutputLevel;
+  onOutputLevelChange: (level: OutputLevel) => void;
+  clearOnCopy: boolean;
+  onClearOnCopyChange: (enabled: boolean) => void;
+  onClearAnnotations: () => void | Promise<void>;
+  onComplete: () => void | Promise<void>;
+  onError?: (message: string) => void;
 }
 
 export function OnUIToolbar({
-    isAnnotateMode,
-    multiSelectCount,
-    onToggleAnnotateMode,
-    annotations,
-    outputLevel,
-    onOutputLevelChange,
-    clearOnCopy,
-    onClearOnCopyChange,
-    onClearAnnotations,
-    onComplete,
-    onError,
+  isAnnotateMode,
+  isDrawMode,
+  drawShape,
+  multiSelectCount,
+  onToggleAnnotateMode,
+  onToggleDrawMode,
+  onSelectDrawShape,
+  onEscape,
+  annotations,
+  outputLevel,
+  onOutputLevelChange,
+  clearOnCopy,
+  onClearOnCopyChange,
+  onClearAnnotations,
+  onComplete,
+  onError,
 }: OnUIToolbarProps) {
-    const LOG_PREFIX = "[onUI][toolbar]";
-    const [isExpanded, setIsExpanded] = useState(false);
-    const [showSettings, setShowSettings] = useState(false);
-    const [copySuccess, setCopySuccess] = useState(false);
-    const [completeSuccess, setCompleteSuccess] = useState(false);
-    const [isCompleting, setIsCompleting] = useState(false);
-    const [isStartingAnnotate, setIsStartingAnnotate] = useState(false);
+  const LOG_PREFIX = '[onUI][toolbar]';
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [completeSuccess, setCompleteSuccess] = useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
+  const [isStartingAnnotate, setIsStartingAnnotate] = useState(false);
 
-    // Just use the user's explicit toggle state
-    const effectiveExpanded = isExpanded;
-    const annotateActive = isAnnotateMode || (effectiveExpanded && isStartingAnnotate);
+  // Just use the user's explicit toggle state
+  const effectiveExpanded = isExpanded;
+  const annotateActive = isAnnotateMode || (effectiveExpanded && isStartingAnnotate);
 
-    useEffect(() => {
-        if (!effectiveExpanded || isAnnotateMode) {
-            setIsStartingAnnotate(false);
+  useEffect(() => {
+    if (!effectiveExpanded || isAnnotateMode || isDrawMode) {
+      setIsStartingAnnotate(false);
+    }
+  }, [effectiveExpanded, isAnnotateMode, isDrawMode]);
+
+  const handleTogglePanel = useCallback(() => {
+    setIsExpanded((prev) => {
+      const nextExpanded = !prev;
+      if (nextExpanded && !isAnnotateMode && !isDrawMode) {
+        setIsStartingAnnotate(true);
+        const toggleResult = onToggleAnnotateMode();
+        if (toggleResult && typeof (toggleResult as Promise<boolean>).then === 'function') {
+          void Promise.resolve(toggleResult)
+            .then((didToggle) => {
+              if (!didToggle) {
+                setIsStartingAnnotate(false);
+              }
+            })
+            .catch(() => {
+              setIsStartingAnnotate(false);
+            });
         }
-    }, [effectiveExpanded, isAnnotateMode]);
+      }
+      return nextExpanded;
+    });
+    setShowSettings(false);
+  }, [isAnnotateMode, isDrawMode, onToggleAnnotateMode]);
 
-    const handleTogglePanel = useCallback(() => {
-        setIsExpanded((prev) => {
-            const nextExpanded = !prev;
-            if (nextExpanded && !isAnnotateMode) {
-                setIsStartingAnnotate(true);
-                const toggleResult = onToggleAnnotateMode();
-                if (
-                    toggleResult &&
-                    typeof (toggleResult as Promise<boolean>).then === "function"
-                ) {
-                    void Promise.resolve(toggleResult)
-                        .then((didToggle) => {
-                            if (!didToggle) {
-                                setIsStartingAnnotate(false);
-                            }
-                        })
-                        .catch(() => {
-                            setIsStartingAnnotate(false);
-                        });
-                }
-            }
-            return nextExpanded;
-        });
-        setShowSettings(false);
-    }, [isAnnotateMode, onToggleAnnotateMode]);
+  const handleCopy = useCallback(async () => {
+    if (annotations.length === 0) {
+      console.log(`${LOG_PREFIX} no annotations to copy`);
+      return;
+    }
 
-    // Escape key to exit annotation mode
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.defaultPrevented) {
-                return;
-            }
-            if (e.key === "Escape" && annotateActive) {
-                onToggleAnnotateMode();
-            }
-        };
-        document.addEventListener("keydown", handleKeyDown);
-        return () => document.removeEventListener("keydown", handleKeyDown);
-    }, [annotateActive, onToggleAnnotateMode]);
+    const output = generateOutput(annotations, outputLevel);
+    const success = await copyToClipboard(output);
 
-    const handleCopy = useCallback(async () => {
-        if (annotations.length === 0) {
-            console.log(`${LOG_PREFIX} no annotations to copy`);
-            return;
-        }
+    if (success) {
+      if (clearOnCopy) {
+        await Promise.resolve(onClearAnnotations());
+        console.log(`${LOG_PREFIX} clear-on-copy enabled: annotations cleared`);
+      }
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+      console.log(`${LOG_PREFIX} annotations copied to clipboard`);
+    } else {
+      console.error(`${LOG_PREFIX} failed to copy annotations`);
+    }
+  }, [annotations, outputLevel, clearOnCopy, onClearAnnotations, LOG_PREFIX]);
 
-        const output = generateOutput(annotations, outputLevel);
-        const success = await copyToClipboard(output);
+  const handleClear = useCallback(() => {
+    if (annotations.length === 0) return;
+    onClearAnnotations();
+    console.log(`${LOG_PREFIX} annotations cleared`);
+  }, [annotations.length, onClearAnnotations, LOG_PREFIX]);
 
-        if (success) {
-            if (clearOnCopy) {
-                await Promise.resolve(onClearAnnotations());
-                console.log(
-                    `${LOG_PREFIX} clear-on-copy enabled: annotations cleared`,
-                );
-            }
-            setCopySuccess(true);
-            setTimeout(() => setCopySuccess(false), 2000);
-            console.log(`${LOG_PREFIX} annotations copied to clipboard`);
-        } else {
-            console.error(`${LOG_PREFIX} failed to copy annotations`);
-        }
-    }, [annotations, outputLevel, clearOnCopy, onClearAnnotations, LOG_PREFIX]);
+  const handleComplete = useCallback(async () => {
+    if (annotations.length === 0 || isCompleting) {
+      return;
+    }
 
-    const handleClear = useCallback(() => {
-        if (annotations.length === 0) return;
-        onClearAnnotations();
-        console.log(`${LOG_PREFIX} annotations cleared`);
-    }, [annotations.length, onClearAnnotations, LOG_PREFIX]);
+    setIsCompleting(true);
+    try {
+      const output = generateOutput(annotations, outputLevel);
+      const copied = await copyToClipboard(output);
+      if (!copied) {
+        onError?.('Failed to copy annotations.');
+        console.error(`${LOG_PREFIX} complete failed: copy unsuccessful`);
+        return;
+      }
 
-    const handleComplete = useCallback(async () => {
-        if (annotations.length === 0 || isCompleting) {
-            return;
-        }
+      await Promise.resolve(onComplete());
+      setCompleteSuccess(true);
+      setTimeout(() => setCompleteSuccess(false), 2000);
+      console.log(`${LOG_PREFIX} complete finished`);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to complete annotation workflow.';
+      onError?.(message);
+      console.error(`${LOG_PREFIX} complete failed`, error);
+    } finally {
+      setIsCompleting(false);
+    }
+  }, [annotations, isCompleting, onComplete, onError, outputLevel, LOG_PREFIX]);
 
-        setIsCompleting(true);
-        try {
-            const output = generateOutput(annotations, outputLevel);
-            const copied = await copyToClipboard(output);
-            if (!copied) {
-                onError?.("Failed to copy annotations.");
-                console.error(
-                    `${LOG_PREFIX} complete failed: copy unsuccessful`,
-                );
-                return;
-            }
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) {
+        return;
+      }
 
-            await Promise.resolve(onComplete());
-            setCompleteSuccess(true);
-            setTimeout(() => setCompleteSuccess(false), 2000);
-            console.log(`${LOG_PREFIX} complete finished`);
-        } catch (error) {
-            const message =
-                error instanceof Error
-                    ? error.message
-                    : "Failed to complete annotation workflow.";
-            onError?.(message);
-            console.error(`${LOG_PREFIX} complete failed`, error);
-        } finally {
-            setIsCompleting(false);
-        }
-    }, [
-        annotations,
-        isCompleting,
-        onComplete,
-        onError,
-        outputLevel,
-        LOG_PREFIX,
-    ]);
+      if (event.key !== 'Escape') {
+        return;
+      }
 
-    return (
-        <div class="onui-toolbar">
-            {/* Expandable Panel */}
-            {effectiveExpanded && (
-                <div class="onui-panel">
-                    <div class="onui-panel-header">
-                        <span class="onui-panel-title">
-                            on<span class="onui-panel-title-accent">UI</span>
-                        </span>
-                        {annotations.length > 0 && (
-                            <span class="onui-panel-badge">
-                                {annotations.length}
-                            </span>
-                        )}
+      onEscape();
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onEscape]);
+
+  const activeHintMode = isDrawMode ? 'draw' : annotateActive ? 'annotate' : null;
+  const activeHint =
+    activeHintMode === 'annotate'
+      ? multiSelectCount > 0
+        ? `Shift multi-select: ${multiSelectCount} selected. Release Shift to annotate all.`
+        : 'Tip: hold Shift and click to multi-select elements.'
+      : activeHintMode === 'draw'
+        ? `Drag to draw a ${drawShape} region.`
+        : null;
+
+  return (
+    <div class="onui-toolbar">
+      {effectiveExpanded && (
+        <div class="onui-toolbar-panel">
+          <div class="onui-toolbar-header">
+            <div class="onui-toolbar-header-main">
+              <span class="onui-toolbar-title">
+                on<span class="onui-toolbar-title-accent">UI</span>
+              </span>
+            </div>
+            <span class={`onui-toolbar-count ${annotations.length === 0 ? 'is-empty' : ''}`}>
+              {annotations.length}
+            </span>
+          </div>
+
+          <div class="onui-toolbar-section">
+            <div class="onui-toolbar-mode-stack">
+              <div class="onui-toolbar-mode-anchor">
+                <button
+                  class={`onui-toolbar-btn onui-toolbar-btn--mode ${annotateActive ? 'is-active' : ''}`}
+                  onClick={onToggleAnnotateMode}
+                  aria-label="Toggle annotate mode"
+                  title="Toggle annotate mode"
+                >
+                  <CrosshairIcon />
+                </button>
+
+                {activeHintMode === 'annotate' && activeHint && (
+                  <div class="onui-toolbar-hint-popup" role="status" aria-live="polite">
+                    <span class="onui-toolbar-hint-arrow" aria-hidden="true" />
+                    {activeHint}
+                  </div>
+                )}
+              </div>
+
+              <div class="onui-toolbar-draw-block">
+                <div class="onui-toolbar-mode-anchor">
+                  <button
+                    class={`onui-toolbar-btn onui-toolbar-btn--mode ${isDrawMode ? 'is-active' : ''}`}
+                    onClick={onToggleDrawMode}
+                    aria-label="Toggle draw mode"
+                    title="Toggle draw mode"
+                  >
+                    <PenIcon />
+                  </button>
+
+                  {activeHintMode === 'draw' && activeHint && (
+                    <div class="onui-toolbar-hint-popup" role="status" aria-live="polite">
+                      <span class="onui-toolbar-hint-arrow" aria-hidden="true" />
+                      {activeHint}
                     </div>
-
-                    {/* Annotate Mode Button */}
-                    <button
-                        class={`onui-btn ${annotateActive ? "active" : ""}`}
-                        onClick={onToggleAnnotateMode}
-                        title="Toggle annotate mode"
-                    >
-                        <CrosshairIcon />
-                        <span class="onui-btn-label">
-                            {annotateActive ? "Annotating..." : "Annotate"}
-                        </span>
-                    </button>
-
-                    {annotateActive && (
-                        <div
-                            class="onui-inline-tip"
-                            role="status"
-                            aria-live="polite"
-                        >
-                            {multiSelectCount > 0
-                                ? `Shift multi-select: ${multiSelectCount} selected. Release Shift to annotate all.`
-                                : "Tip: hold Shift and click to multi-select elements."}
-                        </div>
-                    )}
-
-                    {/* Copy Button */}
-                    <button
-                        class={`onui-btn ${copySuccess ? "active" : ""}`}
-                        onClick={handleCopy}
-                        disabled={annotations.length === 0}
-                        title="Copy annotations"
-                    >
-                        {copySuccess ? <CheckIcon /> : <CopyIcon />}
-                        <span class="onui-btn-label">
-                            {copySuccess ? "Copied!" : "Copy"}
-                        </span>
-                    </button>
-
-                    {/* Clear Button */}
-                    <button
-                        class="onui-btn"
-                        onClick={handleClear}
-                        disabled={annotations.length === 0}
-                        title="Clear annotations"
-                    >
-                        <TrashIcon />
-                        <span class="onui-btn-label">Clear</span>
-                    </button>
-
-                    <button
-                        class={`onui-btn ${completeSuccess ? "active" : ""}`}
-                        onClick={handleComplete}
-                        disabled={annotations.length === 0 || isCompleting}
-                        title="Copy, clear, and exit annotate mode"
-                    >
-                        {completeSuccess ? <CheckIcon /> : <OnUIIcon />}
-                        <span class="onui-btn-label">
-                            {isCompleting
-                                ? "Completing..."
-                                : completeSuccess
-                                  ? "Completed"
-                                  : "Complete"}
-                        </span>
-                    </button>
-
-                    <div class="onui-divider" />
-
-                    {/* Settings Toggle */}
-                    <button
-                        class={`onui-btn ${showSettings ? "active" : ""}`}
-                        onClick={() => setShowSettings((prev) => !prev)}
-                        title="Open settings"
-                    >
-                        <SettingsIcon />
-                        <span class="onui-btn-label">Settings</span>
-                    </button>
-
-                    {/* Settings Panel */}
-                    {showSettings && (
-                        <div class="onui-settings">
-                            <div class="onui-setting-row">
-                                <label class="onui-setting-label">
-                                    Output Level
-                                </label>
-                                <select
-                                    class="onui-select"
-                                    value={outputLevel}
-                                    onChange={(e) =>
-                                        onOutputLevelChange(
-                                            (e.target as HTMLSelectElement)
-                                                .value as OutputLevel,
-                                        )
-                                    }
-                                >
-                                    <option value="compact">Compact</option>
-                                    <option value="standard">Standard</option>
-                                    <option value="detailed">Detailed</option>
-                                    <option value="forensic">Forensic</option>
-                                </select>
-                            </div>
-
-                            <label class="onui-setting-toggle-row">
-                                <input
-                                    class="onui-setting-checkbox"
-                                    type="checkbox"
-                                    checked={clearOnCopy}
-                                    onChange={(e) =>
-                                        onClearOnCopyChange(
-                                            (e.target as HTMLInputElement)
-                                                .checked,
-                                        )
-                                    }
-                                />
-                                <span class="onui-setting-label">
-                                    Clear On Copy
-                                </span>
-                            </label>
-                        </div>
-                    )}
+                  )}
                 </div>
-            )}
 
-            {/* Main Toggle Button */}
+                {isDrawMode && (
+                  <div class="onui-toolbar-shape-row" role="group" aria-label="Draw shape tools">
+                    <button
+                      class={`onui-toolbar-shape-btn ${drawShape === 'rectangle' ? 'is-active' : ''}`}
+                      onClick={() => onSelectDrawShape('rectangle')}
+                      aria-label="Draw rectangle"
+                      title="Draw rectangle"
+                    >
+                      <RectangleIcon />
+                    </button>
+                    <button
+                      class={`onui-toolbar-shape-btn ${drawShape === 'ellipse' ? 'is-active' : ''}`}
+                      onClick={() => onSelectDrawShape('ellipse')}
+                      aria-label="Draw ellipse"
+                      title="Draw ellipse"
+                    >
+                      <EllipseIcon />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div class="onui-toolbar-section">
+            <div class="onui-toolbar-action-stack">
+              <button
+                class={`onui-toolbar-btn ${copySuccess ? 'is-active' : ''}`}
+                onClick={handleCopy}
+                disabled={annotations.length === 0}
+                aria-label="Copy annotations"
+                title={copySuccess ? 'Copied' : 'Copy annotations'}
+              >
+                {copySuccess ? <CheckIcon /> : <CopyIcon />}
+              </button>
+
+              <button
+                class="onui-toolbar-btn onui-toolbar-btn--subtle"
+                onClick={handleClear}
+                disabled={annotations.length === 0}
+                aria-label="Clear annotations"
+                title="Clear annotations"
+              >
+                <TrashIcon />
+              </button>
+
+              <button
+                class={`onui-toolbar-btn ${completeSuccess ? 'is-active' : ''}`}
+                onClick={handleComplete}
+                disabled={annotations.length === 0 || isCompleting}
+                aria-label="Complete annotations"
+                title="Copy, clear, and exit capture mode"
+              >
+                {completeSuccess ? <CheckIcon /> : <OnUIIcon />}
+              </button>
+            </div>
+          </div>
+
+          <div class="onui-toolbar-section onui-toolbar-section--settings">
             <button
-                class={`onui-toggle ${effectiveExpanded ? "active" : ""}`}
-                onClick={handleTogglePanel}
-                title="Toggle onUI panel"
+              class={`onui-toolbar-btn onui-toolbar-btn--settings ${showSettings ? 'is-active' : ''}`}
+              onClick={() => setShowSettings((prev) => !prev)}
+              aria-label="Toggle settings"
+              title="Toggle settings"
             >
-                <OnUIIcon />
+              <SettingsIcon />
             </button>
+
+            {showSettings && (
+              <div class="onui-toolbar-settings">
+                <div class="onui-toolbar-setting-row">
+                  <label class="onui-toolbar-setting-label">Output level</label>
+                  <select
+                    class="onui-toolbar-select"
+                    value={outputLevel}
+                    onChange={(e) =>
+                      onOutputLevelChange((e.target as HTMLSelectElement).value as OutputLevel)
+                    }
+                  >
+                    <option value="compact">Compact</option>
+                    <option value="standard">Standard</option>
+                    <option value="detailed">Detailed</option>
+                    <option value="forensic">Forensic</option>
+                  </select>
+                </div>
+
+                <label class="onui-toolbar-setting-toggle">
+                  <input
+                    class="onui-toolbar-setting-checkbox"
+                    type="checkbox"
+                    checked={clearOnCopy}
+                    onChange={(e) => onClearOnCopyChange((e.target as HTMLInputElement).checked)}
+                  />
+                  <span class="onui-toolbar-setting-label">Clear on copy</span>
+                </label>
+              </div>
+            )}
+          </div>
         </div>
-    );
+      )}
+
+      <button
+        class={`onui-toggle ${effectiveExpanded ? 'active' : ''}`}
+        onClick={handleTogglePanel}
+        aria-label="Toggle onUI panel"
+        title="Toggle onUI panel"
+      >
+        <OnUIIcon />
+      </button>
+    </div>
+  );
 }

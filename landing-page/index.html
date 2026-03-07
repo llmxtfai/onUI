@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>onUI — Annotate Any UI for AI Agents</title>
-  <meta name="description" content="onUI is a lightweight Chrome extension to annotate UI elements for AI agents with zero code integration. Built by onLLM.">
+  <meta name="description" content="onUI is a lightweight browser extension for Chrome, Edge, and Firefox to annotate UI elements for AI agents with zero code integration. Built by onLLM.">
   <meta name="color-scheme" content="light dark">
   <link rel="icon" type="image/png" sizes="128x128" href="./assets/onui-mark-128.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -63,10 +63,10 @@
         </a>
       </div>
 
-      <h1>Ship cleaner UI products by annotating any UI directly in the browser.</h1>
+      <h1>Annotate elements, draw regions, and ship cleaner UI faster.</h1>
 
       <p class="hero-sub">
-        onUI adds a visual annotation layer to any web app, then exports structured context your agents can use immediately. Annotate single elements or multi-select related UI in one pass. With <code>onui-local</code> MCP connected, your agent can continuously read fresh annotations and keep applying fixes — like UI pair programming. No app code changes. No backend.
+        onUI gives you two capture modes in one workflow: <strong>Annotate mode</strong> for element-level fixes and <strong>Draw mode</strong> for layout or spacing regions. The new compact toolbar design keeps primary actions in a minimal rail, while settings open in a focused pop-out card. With <code>onui-local</code> MCP connected, your agent can read fresh annotations and iterate continuously. No app code changes. No backend.
       </p>
 
       <div class="hero-cta">
@@ -100,11 +100,34 @@
       </div>
 
       <div class="hero-chips">
-        <span class="chip chip-teal">Chrome Stable</span>
-        <span class="chip chip-teal">Edge Stable (Unpacked)</span>
-        <span class="chip chip-teal">Multi-Element Selection</span>
-        <span class="chip chip-blue">Local MCP</span>
+        <span class="chip chip-teal">Annotate + multi-select</span>
+        <span class="chip chip-teal">Draw mode regions</span>
+        <span class="chip chip-blue">Redesigned toolbar UI</span>
         <span class="chip chip-amber">Zero Backend</span>
+      </div>
+
+      <div class="browser-showcase" aria-label="Supported browsers">
+        <article class="browser-card browser-card-chrome">
+          <div class="browser-card-head">
+            <span class="browser-dot" aria-hidden="true"></span>
+            <h3>Google Chrome</h3>
+          </div>
+          <p>Install directly from Chrome Web Store for the fastest setup.</p>
+        </article>
+        <article class="browser-card browser-card-edge">
+          <div class="browser-card-head">
+            <span class="browser-dot" aria-hidden="true"></span>
+            <h3>Microsoft Edge</h3>
+          </div>
+          <p>Use the Chromium installer path, then load unpacked in Edge.</p>
+        </article>
+        <article class="browser-card browser-card-firefox">
+          <div class="browser-card-head">
+            <span class="browser-dot" aria-hidden="true"></span>
+            <h3>Mozilla Firefox</h3>
+          </div>
+          <p>Use the Firefox installer path, then load temporary add-on.</p>
+        </article>
       </div>
     </section>
 
@@ -115,6 +138,7 @@
       </div>
       <div class="video-container">
         <video controls preload="metadata" poster="./assets/onui-demo-poster.jpg">
+          <source src="./assets/onui-demo.mov" type="video/quicktime">
           <source src="./assets/onui-demo.mp4" type="video/mp4">
           Your browser does not support the demo video.
         </video>
@@ -123,8 +147,8 @@
 
     <section id="features" class="section">
       <div class="section-header">
-        <h2>Built for annotation-first agent workflows</h2>
-        <p>Everything you need for AI-assisted UI development</p>
+        <h2>Built for annotate + draw workflows</h2>
+        <p>Element-level and region-level feedback in the redesigned compact toolbar</p>
       </div>
       <div class="feature-grid">
         <article class="feature-card">
@@ -138,22 +162,22 @@
           <div class="feature-icon feature-icon-blue">
             <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
           </div>
-          <h3>Precision context</h3>
-          <p>Capture intent and severity directly on UI elements so agents understand what to fix and how urgent it is.</p>
+          <h3>Annotate mode for precise UI fixes</h3>
+          <p>Target individual elements, attach intent and severity, and use Shift multi-select when one issue spans multiple components.</p>
         </article>
         <article class="feature-card">
           <div class="feature-icon feature-icon-blue">
             <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 5h8v8H3V5zm10 0h8v8h-8V5zM3 15h8v4H3v-4zm10 2h8v2h-8v-2z"/></svg>
           </div>
-          <h3>Multi-element selection</h3>
-          <p>Select and annotate related elements together when one issue spans multiple UI parts.</p>
+          <h3>Draw mode for layout and spacing</h3>
+          <p>Drag rectangle or ellipse regions to call out spacing, alignment, grouping, and layout problems that are bigger than one element.</p>
         </article>
         <article class="feature-card">
           <div class="feature-icon feature-icon-amber">
             <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
           </div>
-          <h3>Multiple output formats</h3>
-          <p>Export compact, standard, detailed, or forensic reports depending on your debugging depth.</p>
+          <h3>New compact toolbar design</h3>
+          <p>The redesigned floating rail stays small on-page, while settings open in a readable pop-out card for output level and clear-on-copy controls.</p>
         </article>
         <article class="feature-card">
           <div class="feature-icon feature-icon-teal">
@@ -187,8 +211,8 @@
       <div class="workflow-grid">
         <div class="workflow-step workflow-step-teal">
           <span class="workflow-num">01</span>
-          <h3>Mark UI issues</h3>
-          <p>Click single elements or multi-select related UI to add annotations with intent (bug, enhancement, question) and severity.</p>
+          <h3>Capture with Annotate or Draw</h3>
+          <p>Use Annotate mode for single or multi-element feedback, or Draw mode to mark regions for layout and spacing issues.</p>
         </div>
         <div class="workflow-step workflow-step-blue">
           <span class="workflow-num">02</span>
@@ -207,67 +231,108 @@
     <section id="install" class="section">
       <div class="section-header">
         <h2>Get up and running</h2>
-        <p>Install from Chrome Web Store in one click, or use the local installer for unpacked setup on Chrome or Edge</p>
+        <p>Clear install paths for Chrome, Edge, and Firefox</p>
       </div>
       <div class="install-quick-cta">
-        <a class="btn btn-primary install-store-btn" href="https://chromewebstore.google.com/detail/onui/hllgijkdhegkpooopdhbfdjialkhlkan?authuser=0&hl=en-GB" target="_blank" rel="noreferrer">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19 4H5a2 2 0 00-2 2v12a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2zm0 14H5V8h14v10z"/></svg>
-          Add to Chrome
-        </a>
-        <p class="install-quick-note">Opens the Chrome Web Store listing where Chrome shows the install prompt.</p>
+        <div class="install-quick-buttons">
+          <a class="btn btn-primary install-store-btn" href="https://chromewebstore.google.com/detail/onui/hllgijkdhegkpooopdhbfdjialkhlkan?authuser=0&hl=en-GB" target="_blank" rel="noreferrer">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19 4H5a2 2 0 00-2 2v12a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2zm0 14H5V8h14v10z"/></svg>
+            Add to Chrome
+          </a>
+        </div>
+        <p class="install-quick-note">Chrome installs instantly from Web Store. Edge and Firefox follow the browser-specific setup paths below.</p>
       </div>
 
       <div class="install-steps">
-        <!-- Step 1: One-command installer -->
         <div class="install-step-card">
           <div class="install-step-header">
             <span class="install-num">1</span>
-            <h3>Run one install command</h3>
+            <h3>Pick your browser and follow one path</h3>
           </div>
-          <div class="install-commands">
-            <div class="command-block">
-              <code>curl -fsSL https://github.com/onllm-dev/onUI/releases/latest/download/install.sh | bash</code>
-              <button type="button" class="copy-btn" data-copy="curl -fsSL https://github.com/onllm-dev/onUI/releases/latest/download/install.sh | bash" aria-label="Copy command">
-                <svg viewBox="0 0 24 24" class="icon-copy"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-                <svg viewBox="0 0 24 24" class="icon-check"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-              </button>
-            </div>
-            <div class="command-block">
-              <code>irm https://github.com/onllm-dev/onUI/releases/latest/download/install.ps1 | iex</code>
-              <button type="button" class="copy-btn" data-copy="irm https://github.com/onllm-dev/onUI/releases/latest/download/install.ps1 | iex" aria-label="Copy command">
-                <svg viewBox="0 0 24 24" class="icon-copy"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-                <svg viewBox="0 0 24 24" class="icon-check"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-              </button>
-            </div>
+          <div class="browser-install-grid">
+            <article class="browser-install-card browser-install-card-chrome">
+              <div class="browser-install-topline">Fastest path</div>
+              <h4>Chrome</h4>
+              <p>Install directly from Chrome Web Store, then open any page and enable onUI for that tab.</p>
+              <a class="browser-install-link" href="https://chromewebstore.google.com/detail/onui/hllgijkdhegkpooopdhbfdjialkhlkan?authuser=0&hl=en-GB" target="_blank" rel="noreferrer">Open Chrome Web Store</a>
+            </article>
+
+            <article class="browser-install-card browser-install-card-edge">
+              <div class="browser-install-topline">Unpacked flow</div>
+              <h4>Edge</h4>
+              <p>Run the installer, then load the unpacked extension from the generated local folder.</p>
+              <div class="install-commands">
+                <p class="install-command-label">macOS/Linux</p>
+                <div class="command-block">
+                  <code>curl -fsSL https://github.com/onllm-dev/onUI/releases/latest/download/install.sh | bash</code>
+                  <button type="button" class="copy-btn" data-copy="curl -fsSL https://github.com/onllm-dev/onUI/releases/latest/download/install.sh | bash" aria-label="Copy command">
+                    <svg viewBox="0 0 24 24" class="icon-copy"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                    <svg viewBox="0 0 24 24" class="icon-check"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                  </button>
+                </div>
+                <p class="install-command-label">Windows PowerShell</p>
+                <div class="command-block">
+                  <code>irm https://github.com/onllm-dev/onUI/releases/latest/download/install.ps1 | iex</code>
+                  <button type="button" class="copy-btn" data-copy="irm https://github.com/onllm-dev/onUI/releases/latest/download/install.ps1 | iex" aria-label="Copy command">
+                    <svg viewBox="0 0 24 24" class="icon-copy"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                    <svg viewBox="0 0 24 24" class="icon-check"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                  </button>
+                </div>
+              </div>
+            </article>
+
+            <article class="browser-install-card browser-install-card-firefox">
+              <div class="browser-install-topline">Firefox-specific build</div>
+              <h4>Firefox</h4>
+              <p>Run the Firefox installer path, then load the temporary add-on using the generated Firefox manifest.</p>
+              <div class="install-commands">
+                <p class="install-command-label">macOS/Linux</p>
+                <div class="command-block">
+                  <code>curl -fsSL https://github.com/onllm-dev/onUI/releases/latest/download/install.sh | bash -s -- --firefox</code>
+                  <button type="button" class="copy-btn" data-copy="curl -fsSL https://github.com/onllm-dev/onUI/releases/latest/download/install.sh | bash -s -- --firefox" aria-label="Copy command">
+                    <svg viewBox="0 0 24 24" class="icon-copy"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                    <svg viewBox="0 0 24 24" class="icon-check"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                  </button>
+                </div>
+                <p class="install-command-label">Windows PowerShell</p>
+                <div class="command-block">
+                  <code>iwr https://github.com/onllm-dev/onUI/releases/latest/download/install.ps1 -OutFile install.ps1; .\install.ps1 -Firefox</code>
+                  <button type="button" class="copy-btn" data-copy="iwr https://github.com/onllm-dev/onUI/releases/latest/download/install.ps1 -OutFile install.ps1; .\install.ps1 -Firefox" aria-label="Copy command">
+                    <svg viewBox="0 0 24 24" class="icon-copy"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                    <svg viewBox="0 0 24 24" class="icon-check"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                  </button>
+                </div>
+              </div>
+            </article>
           </div>
           <p class="install-step-desc">
-            The installer handles extension setup and will ask if you want MCP setup too. Enter <code>y</code> at the prompt to register <code>onui-local</code> (Node 20+ required).
+            Every installer path can also set up <code>onui-local</code>. Enter <code>y</code> when prompted if you want the local MCP bridge registered too.
           </p>
         </div>
 
-        <!-- Step 2: Load in browser -->
         <div class="install-step-card">
           <div class="install-step-header">
             <span class="install-num">2</span>
-            <h3>Load extension in browser</h3>
+            <h3>Finish the browser-side step</h3>
           </div>
-          <div class="install-chrome-steps">
-            <div class="chrome-step">
-              <span class="chrome-step-num">a</span>
-              <span>Open <code>edge://extensions</code> or <code>chrome://extensions</code></span>
-            </div>
-            <div class="chrome-step">
-              <span class="chrome-step-num">b</span>
-              <span>Enable <strong>Developer mode</strong> (top right toggle)</span>
-            </div>
-            <div class="chrome-step">
-              <span class="chrome-step-num">c</span>
-              <span>Click <strong>Load unpacked</strong> button</span>
-            </div>
-            <div class="chrome-step">
-              <span class="chrome-step-num">d</span>
-              <span>Select <code>~/onUI/extensions/current</code> (or <code>%USERPROFILE%\onUI\extensions\current</code> on Windows)</span>
-            </div>
+          <div class="finish-grid">
+            <article class="finish-card finish-card-chromium">
+              <h4>Chrome + Edge</h4>
+              <ol class="finish-list">
+                <li>Open <code>edge://extensions</code> or <code>chrome://extensions</code></li>
+                <li>Enable <strong>Developer mode</strong></li>
+                <li>Click <strong>Load unpacked</strong></li>
+                <li>Select <code>~/.onui/extensions/current</code> or <code>%USERPROFILE%\.onui\extensions\current</code></li>
+              </ol>
+            </article>
+            <article class="finish-card finish-card-firefox">
+              <h4>Firefox</h4>
+              <ol class="finish-list">
+                <li>Open <code>about:debugging#/runtime/this-firefox</code></li>
+                <li>Click <strong>Load Temporary Add-on...</strong></li>
+                <li>Select <code>~/.onui/extensions/current/manifest.json</code></li>
+              </ol>
+            </article>
           </div>
         </div>
 
@@ -301,7 +366,7 @@
       <div class="faq-list">
         <details>
           <summary>Which browsers are supported in this release?</summary>
-          <p>Chrome stable is fully supported and Edge stable works via unpacked install. Firefox and other browsers are not currently supported.</p>
+          <p>onUI now supports Google Chrome, Microsoft Edge, and Mozilla Firefox. Chrome installs from Web Store, while Edge and Firefox are available through unpacked/release-bundle install paths.</p>
         </details>
         <details>
           <summary>Can I enable onUI globally?</summary>

@@ -1,616 +1,826 @@
-import { useState, useCallback, useEffect } from "preact/hooks";
+import { useState, useCallback, useEffect } from 'preact/hooks';
 import type {
-    Annotation,
-    AnnotationIntent,
-    AnnotationSeverity,
-    OutputLevel,
-} from "@/types";
-import { getSettings, updateSettings } from "../messaging";
-import { ElementHighlight } from "./ElementHighlight";
-import { AnnotationMarkers } from "./AnnotationMarkers";
-import { OnUIToolbar } from "./OnUIToolbar";
-import { OnUIDialog } from "./OnUIDialog";
-import { ErrorToast } from "./ErrorToast";
-import { useElementHover } from "../hooks/useElementHover";
-import { useAnnotations } from "../hooks/useAnnotations";
-import { useTabRuntimeState } from "../hooks/useTabRuntimeState";
-import { createAnnotationFromElement } from "../utils/create-annotation";
+  Annotation,
+  AnnotationIntent,
+  AnnotationSeverity,
+  OutputLevel,
+  RegionGeometry,
+  RegionShape,
+} from '@/types';
+import { getSettings, updateSettings } from '../messaging';
+import { ElementHighlight } from './ElementHighlight';
+import { AnnotationMarkers } from './AnnotationMarkers';
+import { OnUIToolbar } from './OnUIToolbar';
+import { OnUIDialog } from './OnUIDialog';
+import { ErrorToast } from './ErrorToast';
+import { useElementHover } from '../hooks/useElementHover';
+import { useAnnotations } from '../hooks/useAnnotations';
+import { useTabRuntimeState } from '../hooks/useTabRuntimeState';
+import { createAnnotationFromElement } from '../utils/create-annotation';
+import { createAnnotationFromRegion } from '../utils/create-region-annotation';
+import { OnUIRegionDialog } from './OnUIRegionDialog';
+import { RegionDrawOverlay } from './RegionDrawOverlay';
+import { RegionOutline } from './RegionOutline';
+import { RegionTransformHandles } from './RegionTransformHandles';
 
 const MAX_MULTI_SELECTION = 25;
 
 function isSameElement(a: Element, b: Element): boolean {
-    return a.isSameNode(b);
+  return a.isSameNode(b);
 }
 
 function createBatchId(): string {
-    return `batch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `batch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 interface SaveDialogData {
-    comment: string;
-    intent?: AnnotationIntent | undefined;
-    severity?: AnnotationSeverity | undefined;
+  comment: string;
+  intent?: AnnotationIntent | undefined;
+  severity?: AnnotationSeverity | undefined;
 }
 
 function toAnnotationUpdate(data: SaveDialogData) {
-    return {
-        comment: data.comment,
-        ...(data.intent !== undefined ? { intent: data.intent } : {}),
-        ...(data.severity !== undefined ? { severity: data.severity } : {}),
-    };
+  return {
+    comment: data.comment,
+    ...(data.intent !== undefined ? { intent: data.intent } : {}),
+    ...(data.severity !== undefined ? { severity: data.severity } : {}),
+  };
+}
+
+function isRegionAnnotation(
+  annotation: Annotation
+): annotation is Annotation & { targetType: 'region'; region: { shape: RegionShape; geometry: RegionGeometry } } {
+  return annotation.targetType === 'region' && annotation.region !== undefined;
 }
 
 /**
  * Main application component gated by per-tab enabled state
  */
 export function App() {
-    const {
-        enabled,
-        annotateMode,
-        setAnnotateMode,
-        toggleAnnotateMode,
-        isContextInvalid,
-    } = useTabRuntimeState();
+  const {
+    enabled,
+    annotateMode,
+    setAnnotateMode,
+    toggleAnnotateMode,
+    isContextInvalid,
+  } = useTabRuntimeState();
 
-    return (
-        <>
-            {isContextInvalid && (
-                <div class="onui-refresh-banner">
-                    <span>onUI extension has been updated.</span>
-                    <button onClick={() => window.location.reload()}>
-                        Refresh page
-                    </button>
-                </div>
-            )}
+  return (
+    <>
+      {isContextInvalid && (
+        <div class="onui-refresh-banner">
+          <span>onUI extension has been updated.</span>
+          <button onClick={() => window.location.reload()}>Refresh page</button>
+        </div>
+      )}
 
-            {enabled && (
-                <EnabledApp
-                    annotateMode={annotateMode}
-                    onSetAnnotateMode={setAnnotateMode}
-                    onToggleAnnotateMode={toggleAnnotateMode}
-                />
-            )}
-        </>
-    );
+      {enabled && (
+        <EnabledApp
+          annotateMode={annotateMode}
+          onSetAnnotateMode={setAnnotateMode}
+          onToggleAnnotateMode={toggleAnnotateMode}
+        />
+      )}
+    </>
+  );
 }
 
 interface EnabledAppProps {
-    annotateMode: boolean;
-    onSetAnnotateMode: (annotateMode: boolean) => Promise<boolean>;
-    onToggleAnnotateMode: () => Promise<boolean>;
+  annotateMode: boolean;
+  onSetAnnotateMode: (annotateMode: boolean) => Promise<boolean>;
+  onToggleAnnotateMode: () => Promise<boolean>;
 }
 
 function EnabledApp({
-    annotateMode,
-    onSetAnnotateMode,
-    onToggleAnnotateMode,
+  annotateMode,
+  onSetAnnotateMode,
+  onToggleAnnotateMode,
 }: EnabledAppProps) {
-    const {
-        annotations,
-        addAnnotation,
-        addAnnotationsBulk,
-        updateAnnotation,
-        deleteAnnotation,
-        clearAnnotations,
-        isContextInvalid,
-    } = useAnnotations();
+  const {
+    annotations,
+    addAnnotation,
+    addAnnotationsBulk,
+    updateAnnotation,
+    deleteAnnotation,
+    clearAnnotations,
+    isContextInvalid,
+  } = useAnnotations();
 
-    // Output level for onUI
-    const [outputLevel, setOutputLevel] = useState<OutputLevel>("standard");
-    const [clearOnCopy, setClearOnCopy] = useState(false);
+  // Output level for onUI
+  const [outputLevel, setOutputLevel] = useState<OutputLevel>('standard');
+  const [clearOnCopy, setClearOnCopy] = useState(false);
 
-    // Element being annotated (popup open)
-    const [selectedElement, setSelectedElement] = useState<Element | null>(
-        null,
-    );
+  // Draw mode state (local v1)
+  const [isDrawMode, setIsDrawMode] = useState(false);
+  const [drawShape, setDrawShape] = useState<RegionShape>('rectangle');
+  const [drawCancelSignal, setDrawCancelSignal] = useState(0);
+  const [isDrawingDraft, setIsDrawingDraft] = useState(false);
 
-    // Multi-select targets before shift is released
-    const [pendingMultiSelection, setPendingMultiSelection] = useState<
-        Element[]
-    >([]);
+  // Region create/edit state
+  const [pendingRegion, setPendingRegion] = useState<{ geometry: RegionGeometry; shape: RegionShape } | null>(null);
+  const [editingRegionGeometry, setEditingRegionGeometry] = useState<RegionGeometry | null>(null);
 
-    // Multi-select targets shown in dialog
-    const [multiDialogTargets, setMultiDialogTargets] = useState<Element[]>([]);
+  // Element being annotated (popup open)
+  const [selectedElement, setSelectedElement] = useState<Element | null>(null);
 
-    // Annotation being edited
-    const [editingAnnotation, setEditingAnnotation] =
-        useState<Annotation | null>(null);
+  // Multi-select targets before shift is released
+  const [pendingMultiSelection, setPendingMultiSelection] = useState<Element[]>([]);
 
-    const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // Multi-select targets shown in dialog
+  const [multiDialogTargets, setMultiDialogTargets] = useState<Element[]>([]);
 
-    useEffect(() => {
-        let mounted = true;
+  // Annotation being edited
+  const [editingAnnotation, setEditingAnnotation] = useState<Annotation | null>(null);
 
-        const loadSettings = async () => {
-            const response = await getSettings();
-            if (!mounted || !response.success || !response.data) {
-                return;
-            }
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-            setClearOnCopy(Boolean(response.data.clearOnCopy));
-        };
+  useEffect(() => {
+    let mounted = true;
 
-        void loadSettings();
+    const loadSettings = async () => {
+      const response = await getSettings();
+      if (!mounted || !response.success || !response.data) {
+        return;
+      }
 
-        return () => {
-            mounted = false;
-        };
-    }, []);
+      setClearOnCopy(Boolean(response.data.clearOnCopy));
+    };
 
-    // Clear temporary state when annotate mode is disabled
-    useEffect(() => {
-        if (!annotateMode) {
-            setSelectedElement(null);
-            setPendingMultiSelection([]);
-            setMultiDialogTargets([]);
-            setEditingAnnotation(null);
+    void loadSettings();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Clear temporary state when annotate mode is disabled
+  useEffect(() => {
+    if (!annotateMode) {
+      setSelectedElement(null);
+      setPendingMultiSelection([]);
+      setMultiDialogTargets([]);
+      setEditingAnnotation(null);
+    }
+  }, [annotateMode]);
+
+  useEffect(() => {
+    if (!isDrawMode) {
+      setIsDrawingDraft(false);
+    }
+  }, [isDrawMode]);
+
+  // Handle element click in annotation mode
+  const handleElementClick = useCallback((element: Element, event: MouseEvent) => {
+    setEditingAnnotation(null);
+    setPendingRegion(null);
+
+    if (event.shiftKey) {
+      setSelectedElement(null);
+      setMultiDialogTargets([]);
+
+      setPendingMultiSelection((prev) => {
+        const alreadySelected = prev.some((candidate) => isSameElement(candidate, element));
+        if (alreadySelected) {
+          return prev.filter((candidate) => !isSameElement(candidate, element));
         }
-    }, [annotateMode]);
 
-    // Handle element click in annotation mode
-    const handleElementClick = useCallback(
-        (element: Element, event: MouseEvent) => {
-            setEditingAnnotation(null);
+        if (prev.length >= MAX_MULTI_SELECTION) {
+          setToastMessage(`You can select up to ${MAX_MULTI_SELECTION} elements per batch.`);
+          return prev;
+        }
 
-            if (event.shiftKey) {
-                setSelectedElement(null);
-                setMultiDialogTargets([]);
+        return [...prev, element];
+      });
+      return;
+    }
 
-                setPendingMultiSelection((prev) => {
-                    const alreadySelected = prev.some((candidate) =>
-                        isSameElement(candidate, element),
-                    );
-                    if (alreadySelected) {
-                        return prev.filter(
-                            (candidate) => !isSameElement(candidate, element),
-                        );
-                    }
+    setPendingMultiSelection([]);
+    setMultiDialogTargets([]);
+    setSelectedElement(element);
+  }, []);
 
-                    if (prev.length >= MAX_MULTI_SELECTION) {
-                        setToastMessage(
-                            `You can select up to ${MAX_MULTI_SELECTION} elements per batch.`,
-                        );
-                        return prev;
-                    }
+  // Open multi-target dialog when shift is released
+  useEffect(() => {
+    const handleShiftRelease = (event: KeyboardEvent) => {
+      if (event.key !== 'Shift') return;
+      if (!annotateMode) return;
+      if (selectedElement || editingAnnotation || multiDialogTargets.length > 0) return;
+      if (pendingMultiSelection.length === 0) return;
 
-                    return [...prev, element];
-                });
-                return;
-            }
+      const connectedTargets = pendingMultiSelection.filter((element) => element.isConnected);
+      setPendingMultiSelection([]);
 
-            setPendingMultiSelection([]);
-            setMultiDialogTargets([]);
-            setSelectedElement(element);
+      if (connectedTargets.length === 0) {
+        setToastMessage('Selected elements are no longer available.');
+        return;
+      }
+
+      setMultiDialogTargets(connectedTargets);
+    };
+
+    document.addEventListener('keyup', handleShiftRelease);
+    return () => document.removeEventListener('keyup', handleShiftRelease);
+  }, [
+    annotateMode,
+    selectedElement,
+    editingAnnotation,
+    pendingMultiSelection,
+    multiDialogTargets.length,
+  ]);
+
+  // Esc while selecting clears pending multi targets before toolbar exits annotate mode
+  useEffect(() => {
+    const handleEscapeClearSelection = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (!annotateMode) return;
+      if (pendingMultiSelection.length === 0) return;
+      if (selectedElement || editingAnnotation || multiDialogTargets.length > 0) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      setPendingMultiSelection([]);
+    };
+
+    document.addEventListener('keydown', handleEscapeClearSelection, true);
+    return () => document.removeEventListener('keydown', handleEscapeClearSelection, true);
+  }, [
+    annotateMode,
+    pendingMultiSelection.length,
+    selectedElement,
+    editingAnnotation,
+    multiDialogTargets.length,
+  ]);
+
+  const { hoveredElement } = useElementHover({
+    enabled:
+      annotateMode &&
+      !isDrawMode &&
+      !selectedElement &&
+      !editingAnnotation &&
+      multiDialogTargets.length === 0 &&
+      pendingRegion === null,
+    onElementClick: handleElementClick,
+  });
+
+  // Handle save new annotation with optional intent/severity
+  const saveAnnotation = useCallback(
+    async (data: SaveDialogData) => {
+      if (!selectedElement) return false;
+
+      const input = createAnnotationFromElement({
+        element: selectedElement,
+        comment: data.comment,
+        intent: data.intent,
+        severity: data.severity,
+      });
+
+      const created = await addAnnotation(input);
+      if (!created) {
+        setToastMessage('Failed to add annotation. Please try again.');
+        return false;
+      }
+
+      setSelectedElement(null);
+      setToastMessage(null);
+      return true;
+    },
+    [selectedElement, addAnnotation]
+  );
+
+  const handleSaveAnnotation = useCallback(
+    async (data: SaveDialogData) => {
+      await saveAnnotation(data);
+    },
+    [saveAnnotation]
+  );
+
+  const handleRegionDrawComplete = useCallback((geometry: RegionGeometry) => {
+    setSelectedElement(null);
+    setPendingMultiSelection([]);
+    setMultiDialogTargets([]);
+    setEditingAnnotation(null);
+    setIsDrawingDraft(false);
+    setIsDrawMode(false);
+    setPendingRegion({ geometry, shape: drawShape });
+  }, [drawShape]);
+
+  const handleSaveRegionAnnotation = useCallback(
+    async (data: SaveDialogData) => {
+      if (!pendingRegion) {
+        return;
+      }
+
+      const input = createAnnotationFromRegion({
+        comment: data.comment,
+        shape: pendingRegion.shape,
+        geometry: pendingRegion.geometry,
+        intent: data.intent,
+        severity: data.severity,
+      });
+
+      const created = await addAnnotation(input);
+      if (!created) {
+        setToastMessage('Failed to add region annotation. Please try again.');
+        return;
+      }
+
+      setPendingRegion(null);
+      setIsDrawMode(false);
+      setIsDrawingDraft(false);
+      setToastMessage(null);
+    },
+    [addAnnotation, pendingRegion]
+  );
+
+  // Handle save multi annotation batch with shared intent/severity/comment
+  const saveMultiAnnotation = useCallback(
+    async (data: SaveDialogData) => {
+      if (multiDialogTargets.length === 0) return false;
+
+      const connectedTargets = multiDialogTargets.filter((target) => target.isConnected);
+      if (connectedTargets.length !== multiDialogTargets.length) {
+        setMultiDialogTargets(connectedTargets);
+      }
+
+      if (connectedTargets.length === 0) {
+        setMultiDialogTargets([]);
+        setToastMessage('Selected elements are no longer available.');
+        return false;
+      }
+
+      const batchId = createBatchId();
+      const inputs = connectedTargets.map((element) =>
+        createAnnotationFromElement({
+          element,
+          comment: data.comment,
+          batchId,
+          intent: data.intent,
+          severity: data.severity,
+        })
+      );
+
+      const created = await addAnnotationsBulk(inputs);
+      if (created.length === 0) {
+        setToastMessage('Failed to add annotations. Please try again.');
+        return false;
+      }
+
+      setMultiDialogTargets([]);
+      setToastMessage(null);
+      return true;
+    },
+    [multiDialogTargets, addAnnotationsBulk]
+  );
+
+  const handleSaveMultiAnnotation = useCallback(
+    async (data: SaveDialogData) => {
+      await saveMultiAnnotation(data);
+    },
+    [saveMultiAnnotation]
+  );
+
+  const handleUpdateRegionAnnotation = useCallback(
+    async (data: SaveDialogData) => {
+      if (!editingAnnotation || !isRegionAnnotation(editingAnnotation)) {
+        return;
+      }
+
+      const regionGeometry = editingRegionGeometry ?? editingAnnotation.region.geometry;
+      await updateAnnotation(editingAnnotation.id, {
+        ...toAnnotationUpdate(data),
+        region: {
+          shape: editingAnnotation.region.shape,
+          geometry: regionGeometry,
         },
-        [],
-    );
+        targetType: 'region',
+        boundingBox: {
+          ...editingAnnotation.boundingBox,
+          top: regionGeometry.y,
+          left: regionGeometry.x,
+          width: regionGeometry.width,
+          height: regionGeometry.height,
+          bottom: regionGeometry.y + regionGeometry.height,
+          right: regionGeometry.x + regionGeometry.width,
+          isFixed: false,
+        },
+      });
 
-    // Open multi-target dialog when shift is released
-    useEffect(() => {
-        const handleShiftRelease = (event: KeyboardEvent) => {
-            if (event.key !== "Shift") return;
-            if (!annotateMode) return;
-            if (
-                selectedElement ||
-                editingAnnotation ||
-                multiDialogTargets.length > 0
-            )
-                return;
-            if (pendingMultiSelection.length === 0) return;
+      setEditingAnnotation(null);
+      setEditingRegionGeometry(null);
+    },
+    [editingAnnotation, editingRegionGeometry, updateAnnotation]
+  );
 
-            const connectedTargets = pendingMultiSelection.filter(
-                (element) => element.isConnected,
-            );
-            setPendingMultiSelection([]);
+  // Handle update existing annotation with optional intent/severity
+  const handleUpdateAnnotation = useCallback(
+    async (data: SaveDialogData) => {
+      if (!editingAnnotation) return;
 
-            if (connectedTargets.length === 0) {
-                setToastMessage("Selected elements are no longer available.");
-                return;
-            }
+      await updateAnnotation(editingAnnotation.id, toAnnotationUpdate(data));
+      setEditingAnnotation(null);
+    },
+    [editingAnnotation, updateAnnotation]
+  );
 
-            setMultiDialogTargets(connectedTargets);
-        };
+  // Handle delete annotation
+  const handleDeleteAnnotation = useCallback(async () => {
+    if (!editingAnnotation) return;
 
-        document.addEventListener("keyup", handleShiftRelease);
-        return () => document.removeEventListener("keyup", handleShiftRelease);
-    }, [
-        annotateMode,
-        selectedElement,
-        editingAnnotation,
-        pendingMultiSelection,
-        multiDialogTargets.length,
-    ]);
+    await deleteAnnotation(editingAnnotation.id);
+    setEditingAnnotation(null);
+    setEditingRegionGeometry(null);
+  }, [editingAnnotation, deleteAnnotation]);
 
-    // Esc while selecting clears pending multi targets before toolbar exits annotate mode
-    useEffect(() => {
-        const handleEscapeClearSelection = (event: KeyboardEvent) => {
-            if (event.key !== "Escape") return;
-            if (!annotateMode) return;
-            if (pendingMultiSelection.length === 0) return;
-            if (
-                selectedElement ||
-                editingAnnotation ||
-                multiDialogTargets.length > 0
-            )
-                return;
+  // Handle cancel popup
+  const handleCancelPopup = useCallback(() => {
+    setSelectedElement(null);
+    setPendingMultiSelection([]);
+    setMultiDialogTargets([]);
+    setEditingAnnotation(null);
+    setPendingRegion(null);
+    setEditingRegionGeometry(null);
+    setIsDrawMode(false);
+    setIsDrawingDraft(false);
+    setDrawCancelSignal((value) => value + 1);
+  }, []);
 
-            event.preventDefault();
-            event.stopPropagation();
-            event.stopImmediatePropagation();
-            setPendingMultiSelection([]);
-        };
+  // Handle marker click to edit
+  const handleMarkerClick = useCallback((annotation: Annotation) => {
+    setEditingAnnotation(annotation);
+    setSelectedElement(null);
+    setPendingMultiSelection([]);
+    setMultiDialogTargets([]);
+    setPendingRegion(null);
 
-        document.addEventListener("keydown", handleEscapeClearSelection, true);
-        return () =>
-            document.removeEventListener(
-                "keydown",
-                handleEscapeClearSelection,
-                true,
-            );
-    }, [
-        annotateMode,
-        pendingMultiSelection.length,
-        selectedElement,
-        editingAnnotation,
-        multiDialogTargets.length,
-    ]);
+    if (isRegionAnnotation(annotation)) {
+      setEditingRegionGeometry(annotation.region.geometry);
+    } else {
+      setEditingRegionGeometry(null);
+    }
+  }, []);
 
-    const { hoveredElement } = useElementHover({
-        enabled:
-            annotateMode &&
-            !selectedElement &&
-            !editingAnnotation &&
-            multiDialogTargets.length === 0,
-        onElementClick: handleElementClick,
+  // Get element for editing annotation (find by selector)
+  const getEditingElement = useCallback((): Element | null => {
+    if (!editingAnnotation) return null;
+
+    try {
+      return document.querySelector(editingAnnotation.selector);
+    } catch {
+      return null;
+    }
+  }, [editingAnnotation]);
+
+  const handleToggleDrawMode = useCallback(() => {
+    setIsDrawMode((previous) => {
+      const next = !previous;
+
+      if (next) {
+        if (annotateMode) {
+          void onToggleAnnotateMode();
+        }
+        setSelectedElement(null);
+        setPendingMultiSelection([]);
+        setMultiDialogTargets([]);
+        setEditingAnnotation(null);
+        setEditingRegionGeometry(null);
+        setPendingRegion(null);
+      } else {
+        setPendingRegion(null);
+        setIsDrawingDraft(false);
+        setDrawCancelSignal((value) => value + 1);
+      }
+
+      return next;
     });
+  }, [annotateMode, onToggleAnnotateMode]);
 
-    // Handle save new annotation with optional intent/severity
-    const saveAnnotation = useCallback(
-        async (data: SaveDialogData) => {
-            if (!selectedElement) return false;
+  const handleToggleAnnotateExclusive = useCallback(async () => {
+    if (!annotateMode && isDrawMode) {
+      setIsDrawMode(false);
+      setPendingRegion(null);
+      setIsDrawingDraft(false);
+      setDrawCancelSignal((value) => value + 1);
+    }
 
-            const input = createAnnotationFromElement({
-                element: selectedElement,
-                comment: data.comment,
-                intent: data.intent,
-                severity: data.severity,
-            });
+    if (!annotateMode) {
+      setPendingRegion(null);
+      setEditingAnnotation(null);
+      setEditingRegionGeometry(null);
+    }
 
-            const created = await addAnnotation(input);
-            if (!created) {
-                setToastMessage("Failed to add annotation. Please try again.");
-                return false;
-            }
+    return onToggleAnnotateMode();
+  }, [annotateMode, isDrawMode, onToggleAnnotateMode]);
 
-            setSelectedElement(null);
-            setToastMessage(null);
-            return true;
-        },
-        [selectedElement, addAnnotation],
-    );
+  const handleEscape = useCallback(() => {
+    if (isDrawingDraft) {
+      setDrawCancelSignal((value) => value + 1);
+      setIsDrawingDraft(false);
+      return;
+    }
 
-    const handleSaveAnnotation = useCallback(
-        async (data: SaveDialogData) => {
-            await saveAnnotation(data);
-        },
-        [saveAnnotation],
-    );
+    if (pendingRegion) {
+      setPendingRegion(null);
+      return;
+    }
 
-    // Handle save multi annotation batch with shared intent/severity/comment
-    const saveMultiAnnotation = useCallback(
-        async (data: SaveDialogData) => {
-            if (multiDialogTargets.length === 0) return false;
+    if (isDrawMode) {
+      setIsDrawMode(false);
+      setDrawCancelSignal((value) => value + 1);
+      return;
+    }
 
-            const connectedTargets = multiDialogTargets.filter(
-                (target) => target.isConnected,
-            );
-            if (connectedTargets.length !== multiDialogTargets.length) {
-                setMultiDialogTargets(connectedTargets);
-            }
+    if (editingAnnotation && editingRegionGeometry) {
+      setEditingRegionGeometry(null);
+      return;
+    }
 
-            if (connectedTargets.length === 0) {
-                setMultiDialogTargets([]);
-                setToastMessage("Selected elements are no longer available.");
-                return false;
-            }
+    if (pendingMultiSelection.length > 0) {
+      setPendingMultiSelection([]);
+      return;
+    }
 
-            const batchId = createBatchId();
-            const inputs = connectedTargets.map((element) =>
-                createAnnotationFromElement({
-                    element,
-                    comment: data.comment,
-                    batchId,
-                    intent: data.intent,
-                    severity: data.severity,
-                }),
-            );
+    if (annotateMode) {
+      void onToggleAnnotateMode();
+    }
+  }, [
+    annotateMode,
+    editingAnnotation,
+    editingRegionGeometry,
+    isDrawMode,
+    isDrawingDraft,
+    onToggleAnnotateMode,
+    pendingMultiSelection.length,
+    pendingRegion,
+  ]);
 
-            const created = await addAnnotationsBulk(inputs);
-            if (created.length === 0) {
-                setToastMessage("Failed to add annotations. Please try again.");
-                return false;
-            }
+  // Handle clear all annotations
+  const handleClearAnnotations = useCallback(async () => {
+    await clearAnnotations();
+  }, [clearAnnotations]);
 
-            setMultiDialogTargets([]);
-            setToastMessage(null);
-            return true;
-        },
-        [multiDialogTargets, addAnnotationsBulk],
-    );
+  const handleComplete = useCallback(async () => {
+    const cleared = await clearAnnotations();
+    if (!cleared) {
+      throw new Error('Copied annotations, but failed to clear them.');
+    }
 
-    const handleSaveMultiAnnotation = useCallback(
-        async (data: SaveDialogData) => {
-            await saveMultiAnnotation(data);
-        },
-        [saveMultiAnnotation],
-    );
+    if (isDrawMode) {
+      setIsDrawMode(false);
+      setPendingRegion(null);
+      setIsDrawingDraft(false);
+      setDrawCancelSignal((value) => value + 1);
+    }
 
-    // Handle update existing annotation with optional intent/severity
-    const handleUpdateAnnotation = useCallback(
-        async (data: SaveDialogData) => {
-            if (!editingAnnotation) return;
+    if (!annotateMode) {
+      return;
+    }
 
-            await updateAnnotation(
-                editingAnnotation.id,
-                toAnnotationUpdate(data),
-            );
-            setEditingAnnotation(null);
-        },
-        [editingAnnotation, updateAnnotation],
-    );
+    const annotateDisabled = await onSetAnnotateMode(false);
+    if (!annotateDisabled) {
+      throw new Error('Copied and cleared annotations, but failed to exit annotate mode.');
+    }
+  }, [annotateMode, clearAnnotations, isDrawMode, onSetAnnotateMode]);
 
-    // Handle delete annotation
-    const handleDeleteAnnotation = useCallback(async () => {
-        if (!editingAnnotation) return;
+  const handleCompleteAfterSaveError = useCallback((error: unknown) => {
+    const message =
+      error instanceof Error ? error.message : 'Failed to complete annotation workflow.';
+    setToastMessage(message);
+  }, []);
 
-        await deleteAnnotation(editingAnnotation.id);
-        setEditingAnnotation(null);
-    }, [editingAnnotation, deleteAnnotation]);
+  const handleSaveAnnotationAndComplete = useCallback(
+    async (data: SaveDialogData) => {
+      const saved = await saveAnnotation(data);
+      if (!saved) {
+        return;
+      }
 
-    // Handle cancel popup
-    const handleCancelPopup = useCallback(() => {
-        setSelectedElement(null);
-        setPendingMultiSelection([]);
-        setMultiDialogTargets([]);
-        setEditingAnnotation(null);
-    }, []);
+      try {
+        await handleComplete();
+      } catch (error) {
+        handleCompleteAfterSaveError(error);
+      }
+    },
+    [handleComplete, handleCompleteAfterSaveError, saveAnnotation]
+  );
 
-    // Handle marker click to edit
-    const handleMarkerClick = useCallback((annotation: Annotation) => {
-        setEditingAnnotation(annotation);
-        setSelectedElement(null);
-        setPendingMultiSelection([]);
-        setMultiDialogTargets([]);
-    }, []);
+  const handleSaveMultiAnnotationAndComplete = useCallback(
+    async (data: SaveDialogData) => {
+      const saved = await saveMultiAnnotation(data);
+      if (!saved) {
+        return;
+      }
 
-    // Get element for editing annotation (find by selector)
-    const getEditingElement = useCallback((): Element | null => {
-        if (!editingAnnotation) return null;
+      try {
+        await handleComplete();
+      } catch (error) {
+        handleCompleteAfterSaveError(error);
+      }
+    },
+    [handleComplete, handleCompleteAfterSaveError, saveMultiAnnotation]
+  );
 
-        try {
-            return document.querySelector(editingAnnotation.selector);
-        } catch {
-            return null;
-        }
-    }, [editingAnnotation]);
+  const handleClearOnCopyChange = useCallback(
+    async (enabled: boolean) => {
+      const previous = clearOnCopy;
+      setClearOnCopy(enabled);
 
-    // Handle clear all annotations
-    const handleClearAnnotations = useCallback(async () => {
-        await clearAnnotations();
-    }, [clearAnnotations]);
-
-    const handleComplete = useCallback(async () => {
-        const cleared = await clearAnnotations();
-        if (!cleared) {
-            throw new Error("Copied annotations, but failed to clear them.");
+      try {
+        const response = await updateSettings({ clearOnCopy: enabled });
+        if (response.success) {
+          return;
         }
 
-        if (!annotateMode) {
-            return;
-        }
+        setClearOnCopy(previous);
+        setToastMessage(response.error || 'Failed to save clear-on-copy setting.');
+      } catch {
+        setClearOnCopy(previous);
+        setToastMessage('Failed to save clear-on-copy setting.');
+      }
+    },
+    [clearOnCopy]
+  );
 
-        const annotateDisabled = await onSetAnnotateMode(false);
-        if (!annotateDisabled) {
-            throw new Error(
-                "Copied and cleared annotations, but failed to exit annotate mode.",
-            );
-        }
-    }, [annotateMode, clearAnnotations, onSetAnnotateMode]);
+  // Remove a target from an open multi-target dialog
+  const handleRemoveMultiTarget = useCallback((target: Element) => {
+    setMultiDialogTargets((prev) => prev.filter((candidate) => !isSameElement(candidate, target)));
+  }, []);
 
-    const handleCompleteAfterSaveError = useCallback((error: unknown) => {
-        const message =
-            error instanceof Error
-                ? error.message
-                : "Failed to complete annotation workflow.";
-        setToastMessage(message);
-    }, []);
+  const editingElement = editingAnnotation ? getEditingElement() : null;
+  const editingRegion = editingAnnotation && isRegionAnnotation(editingAnnotation) ? editingAnnotation : null;
+  const regionDialogGeometry = pendingRegion?.geometry ?? editingRegionGeometry ?? editingRegion?.region.geometry ?? null;
+  const regionDialogShape = pendingRegion?.shape ?? editingRegion?.region.shape ?? null;
+  const shouldShowRegionDrawOverlay = isDrawMode && pendingRegion === null && editingAnnotation === null;
 
-    const handleSaveAnnotationAndComplete = useCallback(
-        async (data: SaveDialogData) => {
-            const saved = await saveAnnotation(data);
-            if (!saved) {
-                return;
-            }
+  // Hide toolbar when dialog is open to prevent z-index conflicts
+  const isDialogOpen =
+    selectedElement !== null ||
+    editingAnnotation !== null ||
+    multiDialogTargets.length > 0 ||
+    pendingRegion !== null;
 
-            try {
-                await handleComplete();
-            } catch (error) {
-                handleCompleteAfterSaveError(error);
-            }
-        },
-        [handleComplete, handleCompleteAfterSaveError, saveAnnotation],
-    );
+  return (
+    <>
+      {/* Refresh banner when extension context is invalidated */}
+      {isContextInvalid && (
+        <div class="onui-refresh-banner">
+          <span>onUI extension has been updated.</span>
+          <button onClick={() => window.location.reload()}>Refresh page</button>
+        </div>
+      )}
 
-    const handleSaveMultiAnnotationAndComplete = useCallback(
-        async (data: SaveDialogData) => {
-            const saved = await saveMultiAnnotation(data);
-            if (!saved) {
-                return;
-            }
+      {/* OnUI Toolbar - hidden when dialog is open */}
+      {!isDialogOpen && (
+        <OnUIToolbar
+          isAnnotateMode={annotateMode}
+          isDrawMode={isDrawMode}
+          drawShape={drawShape}
+          multiSelectCount={pendingMultiSelection.length}
+          onToggleAnnotateMode={handleToggleAnnotateExclusive}
+          onToggleDrawMode={handleToggleDrawMode}
+          onSelectDrawShape={setDrawShape}
+          onEscape={handleEscape}
+          annotations={annotations}
+          outputLevel={outputLevel}
+          onOutputLevelChange={setOutputLevel}
+          clearOnCopy={clearOnCopy}
+          onClearOnCopyChange={(enabled) => {
+            void handleClearOnCopyChange(enabled);
+          }}
+          onClearAnnotations={handleClearAnnotations}
+          onComplete={handleComplete}
+          onError={(message) => setToastMessage(message)}
+        />
+      )}
 
-            try {
-                await handleComplete();
-            } catch (error) {
-                handleCompleteAfterSaveError(error);
-            }
-        },
-        [handleComplete, handleCompleteAfterSaveError, saveMultiAnnotation],
-    );
+      {/* Draw overlay */}
+      <RegionDrawOverlay
+        enabled={shouldShowRegionDrawOverlay}
+        shape={drawShape}
+        cancelSignal={drawCancelSignal}
+        onComplete={handleRegionDrawComplete}
+        onDraftStateChange={setIsDrawingDraft}
+      />
 
-    const handleClearOnCopyChange = useCallback(
-        async (enabled: boolean) => {
-            const previous = clearOnCopy;
-            setClearOnCopy(enabled);
+      {/* Persistent region outlines */}
+      {annotations
+        .filter((annotation) => isRegionAnnotation(annotation))
+        .map((annotation) => (
+          <RegionOutline
+            key={`region-outline-${annotation.id}`}
+            annotation={annotation}
+            selected={editingAnnotation?.id === annotation.id}
+          />
+        ))}
 
-            try {
-                const response = await updateSettings({ clearOnCopy: enabled });
-                if (response.success) {
-                    return;
-                }
+      {/* Element highlight when hovering */}
+      {annotateMode &&
+        hoveredElement &&
+        !selectedElement &&
+        !editingAnnotation &&
+        multiDialogTargets.length === 0 &&
+        pendingRegion === null && <ElementHighlight element={hoveredElement} />}
 
-                setClearOnCopy(previous);
-                setToastMessage(
-                    response.error || "Failed to save clear-on-copy setting.",
-                );
-            } catch {
-                setClearOnCopy(previous);
-                setToastMessage("Failed to save clear-on-copy setting.");
-            }
-        },
-        [clearOnCopy],
-    );
+      {/* Highlight selected element */}
+      {selectedElement && <ElementHighlight element={selectedElement} selected />}
 
-    // Remove a target from an open multi-target dialog
-    const handleRemoveMultiTarget = useCallback((target: Element) => {
-        setMultiDialogTargets((prev) =>
-            prev.filter((candidate) => !isSameElement(candidate, target)),
-        );
-    }, []);
+      {/* Highlight pending multi-selected elements */}
+      {pendingMultiSelection.map((element, index) => (
+        <ElementHighlight
+          key={`pending-${element.tagName.toLowerCase()}-${index}`}
+          element={element}
+          selected
+        />
+      ))}
 
-    const editingElement = editingAnnotation ? getEditingElement() : null;
+      {/* Highlight multi-dialog targets */}
+      {multiDialogTargets.map((element, index) => (
+        <ElementHighlight
+          key={`multi-${element.tagName.toLowerCase()}-${index}`}
+          element={element}
+          selected
+        />
+      ))}
 
-    // Hide toolbar when dialog is open to prevent z-index conflicts
-    const isDialogOpen =
-        selectedElement !== null ||
-        editingAnnotation !== null ||
-        multiDialogTargets.length > 0;
+      {/* Highlight element being edited */}
+      {editingElement && <ElementHighlight element={editingElement} selected />}
 
-    return (
-        <>
-            {/* Refresh banner when extension context is invalidated */}
-            {isContextInvalid && (
-                <div class="onui-refresh-banner">
-                    <span>onUI extension has been updated.</span>
-                    <button onClick={() => window.location.reload()}>
-                        Refresh page
-                    </button>
-                </div>
-            )}
+      {/* Region transform handles (edit mode) */}
+      {editingRegion && editingRegionGeometry && (
+        <RegionTransformHandles
+          geometry={editingRegionGeometry}
+          onChange={setEditingRegionGeometry}
+        />
+      )}
 
-            {/* OnUI Toolbar - hidden when dialog is open */}
-            {!isDialogOpen && (
-                <OnUIToolbar
-                    isAnnotateMode={annotateMode}
-                    multiSelectCount={pendingMultiSelection.length}
-                    onToggleAnnotateMode={onToggleAnnotateMode}
-                    annotations={annotations}
-                    outputLevel={outputLevel}
-                    onOutputLevelChange={setOutputLevel}
-                    clearOnCopy={clearOnCopy}
-                    onClearOnCopyChange={(enabled) => {
-                        void handleClearOnCopyChange(enabled);
-                    }}
-                    onClearAnnotations={handleClearAnnotations}
-                    onComplete={handleComplete}
-                    onError={(message) => setToastMessage(message)}
-                />
-            )}
+      {/* New annotation dialog */}
+      {selectedElement && (
+        <OnUIDialog
+          element={selectedElement}
+          onSave={handleSaveAnnotation}
+          onComplete={handleSaveAnnotationAndComplete}
+          onCancel={handleCancelPopup}
+        />
+      )}
 
-            {/* Element highlight when hovering */}
-            {annotateMode &&
-                hoveredElement &&
-                !selectedElement &&
-                !editingAnnotation &&
-                multiDialogTargets.length === 0 && (
-                    <ElementHighlight element={hoveredElement} />
-                )}
+      {/* Multi annotation dialog */}
+      {multiDialogTargets.length > 0 && (
+        <OnUIDialog
+          element={multiDialogTargets[0]!}
+          multiTargets={multiDialogTargets}
+          onRemoveTarget={handleRemoveMultiTarget}
+          onSave={handleSaveMultiAnnotation}
+          onComplete={handleSaveMultiAnnotationAndComplete}
+          onCancel={handleCancelPopup}
+        />
+      )}
 
-            {/* Highlight selected element */}
-            {selectedElement && (
-                <ElementHighlight element={selectedElement} selected />
-            )}
+      {/* Edit annotation dialog */}
+      {editingAnnotation && editingElement && !editingRegion && (
+        <OnUIDialog
+          element={editingElement}
+          initialComment={editingAnnotation.comment}
+          initialIntent={editingAnnotation.intent}
+          initialSeverity={editingAnnotation.severity}
+          isEditing
+          onSave={handleUpdateAnnotation}
+          onCancel={handleCancelPopup}
+          onDelete={handleDeleteAnnotation}
+        />
+      )}
 
-            {/* Highlight pending multi-selected elements */}
-            {pendingMultiSelection.map((element, index) => (
-                <ElementHighlight
-                    key={`pending-${element.tagName.toLowerCase()}-${index}`}
-                    element={element}
-                    selected
-                />
-            ))}
+      {/* Region annotation dialog (create/edit) */}
+      {regionDialogGeometry &&
+        regionDialogShape &&
+        (editingRegion ? (
+          <OnUIRegionDialog
+            geometry={regionDialogGeometry}
+            shape={regionDialogShape}
+            initialComment={editingRegion.comment}
+            {...(editingRegion.intent !== undefined ? { initialIntent: editingRegion.intent } : {})}
+            {...(editingRegion.severity !== undefined ? { initialSeverity: editingRegion.severity } : {})}
+            onSave={handleUpdateRegionAnnotation}
+            onCancel={handleCancelPopup}
+            onDelete={handleDeleteAnnotation}
+          />
+        ) : (
+          <OnUIRegionDialog
+            geometry={regionDialogGeometry}
+            shape={regionDialogShape}
+            onSave={handleSaveRegionAnnotation}
+            onCancel={handleCancelPopup}
+          />
+        ))}
 
-            {/* Highlight multi-dialog targets */}
-            {multiDialogTargets.map((element, index) => (
-                <ElementHighlight
-                    key={`multi-${element.tagName.toLowerCase()}-${index}`}
-                    element={element}
-                    selected
-                />
-            ))}
+      {/* Annotation markers */}
+      <AnnotationMarkers annotations={annotations} onMarkerClick={handleMarkerClick} />
 
-            {/* Highlight element being edited */}
-            {editingElement && (
-                <ElementHighlight element={editingElement} selected />
-            )}
-
-            {/* New annotation dialog */}
-            {selectedElement && (
-                <OnUIDialog
-                    element={selectedElement}
-                    onSave={handleSaveAnnotation}
-                    onComplete={handleSaveAnnotationAndComplete}
-                    onCancel={handleCancelPopup}
-                />
-            )}
-
-            {/* Multi annotation dialog */}
-            {multiDialogTargets.length > 0 && (
-                <OnUIDialog
-                    element={multiDialogTargets[0]!}
-                    multiTargets={multiDialogTargets}
-                    onRemoveTarget={handleRemoveMultiTarget}
-                    onSave={handleSaveMultiAnnotation}
-                    onComplete={handleSaveMultiAnnotationAndComplete}
-                    onCancel={handleCancelPopup}
-                />
-            )}
-
-            {/* Edit annotation dialog */}
-            {editingAnnotation && editingElement && (
-                <OnUIDialog
-                    element={editingElement}
-                    initialComment={editingAnnotation.comment}
-                    initialIntent={editingAnnotation.intent}
-                    initialSeverity={editingAnnotation.severity}
-                    isEditing
-                    onSave={handleUpdateAnnotation}
-                    onCancel={handleCancelPopup}
-                    onDelete={handleDeleteAnnotation}
-                />
-            )}
-
-            {/* Annotation markers */}
-            <AnnotationMarkers
-                annotations={annotations}
-                onMarkerClick={handleMarkerClick}
-            />
-
-            {toastMessage && (
-                <ErrorToast
-                    message={toastMessage}
-                    onDismiss={() => setToastMessage(null)}
-                />
-            )}
-        </>
-    );
+      {toastMessage && (
+        <ErrorToast
+          message={toastMessage}
+          onDismiss={() => setToastMessage(null)}
+        />
+      )}
+    </>
+  );
 }

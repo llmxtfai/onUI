@@ -2,6 +2,8 @@
  * Per-tab state manager
  * Tracks tab runtime state (enabled + annotate mode) for each tab
  */
+import { webext } from '@/shared/webext';
+
 const TAB_RUNTIME_STATES_STORAGE_KEY = 'onui_tab_runtime_states';
 const LOG_PREFIX = '[onUI][background][state]';
 
@@ -14,7 +16,7 @@ export class StateManager {
 
   constructor() {
     // Clean up state when tabs are closed
-    chrome.tabs.onRemoved.addListener((tabId) => {
+    webext.tabs.onRemoved.addListener((tabId) => {
       void this.clearTabState(tabId);
     });
   }

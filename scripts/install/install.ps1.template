@@ -1,5 +1,7 @@
 param(
-  [switch]$Mcp
+  [switch]$Mcp,
+  [switch]$Firefox,
+  [switch]$Chromium
 )
 
 $ErrorActionPreference = "Stop"
@@ -7,15 +9,20 @@ $ErrorActionPreference = "Stop"
 $Version = "__VERSION__"
 $Repo = "onllm-dev/onUI"
 $BaseUrl = if ($env:ONUI_RELEASE_BASE_URL) { $env:ONUI_RELEASE_BASE_URL } else { "https://github.com/$Repo" }
-$OnuiHome = if ($env:ONUI_HOME) { $env:ONUI_HOME } else { Join-Path $HOME "onUI" }
+$DefaultOnuiHome = Join-Path $HOME ".onui"
+$OnuiHome = if ($env:ONUI_HOME) { $env:ONUI_HOME } else { $DefaultOnuiHome }
+$OnuiHomeIsDefault = $OnuiHome -eq $DefaultOnuiHome
 $ExtRoot = Join-Path $OnuiHome "extensions"
 $ExtDir = Join-Path $ExtRoot "v$Version"
 $CurrentDir = Join-Path $ExtRoot "current"
-$ExtUrl = "$BaseUrl/releases/download/v$Version/onui-extension-unpacked-v$Version.zip"
+$ChromiumExtUrl = "$BaseUrl/releases/download/v$Version/onui-extension-unpacked-v$Version.zip"
+$FirefoxExtUrl = "$BaseUrl/releases/download/v$Version/onui-firefox-add-ons-v$Version.zip"
 $McpUrl = "$BaseUrl/releases/download/v$Version/onui-mcp-bundle-v$Version.zip"
 $McpDir = Join-Path (Join-Path $OnuiHome "mcp") "v$Version"
 $mcpEnv = if ($env:ONUI_INSTALL_MCP) { $env:ONUI_INSTALL_MCP.ToLowerInvariant() } else { "" }
 $InstallMcp = $Mcp -or (@("1", "true", "yes", "y") -contains $mcpEnv)
+$browserEnv = if ($env:ONUI_BROWSER_TARGET) { $env:ONUI_BROWSER_TARGET.ToLowerInvariant() } else { "" }
+$BrowserTarget = if ($Firefox -or $browserEnv -eq "firefox") { "firefox" } elseif ($Chromium -or $browserEnv -eq "chromium") { "chromium" } else { "chromium" }
 
 function Write-Log($Message) {
   Write-Host "[onui-install] $Message"
@@ -41,15 +48,65 @@ function Show-NodeInstallHelp {
   Write-Host "After installation, open a new PowerShell window and rerun this installer command."
 }
 
+function Migrate-LegacyInstallHome {
+  if (-not $OnuiHomeIsDefault) {
+    return
+  }
+
+  $legacyHomes = @(
+    (Join-Path $HOME "onUI"),
+    (Join-Path $HOME "onui")
+  )
+
+  foreach ($legacyHome in $legacyHomes) {
+    if (-not (Test-Path $legacyHome)) {
+      continue
+    }
+
+    if ((Resolve-Path $legacyHome).Path -eq $OnuiHome) {
+      continue
+    }
+
+    if (-not (Test-Path $OnuiHome)) {
+      Write-Log "Migrating legacy install directory $legacyHome to $OnuiHome"
+      Move-Item -Path $legacyHome -Destination $OnuiHome -Force
+      continue
+    }
+
+    if (-not (Test-Path $legacyHome -PathType Container)) {
+      Write-Log "Removing unexpected legacy install path $legacyHome"
+      Remove-Item -Path $legacyHome -Force
+      continue
+    }
+
+    Write-Log "Cleaning legacy install directory $legacyHome"
+    New-Item -ItemType Directory -Path $OnuiHome -Force | Out-Null
+
+    foreach ($item in Get-ChildItem -Path $legacyHome -Force) {
+      $destination = Join-Path $OnuiHome $item.Name
+      if (-not (Test-Path $destination)) {
+        Move-Item -Path $item.FullName -Destination $destination -Force
+      } else {
+        Remove-Item -Path $item.FullName -Recurse -Force
+      }
+    }
+
+    if (Test-Path $legacyHome) {
+      Remove-Item -Path $legacyHome -Recurse -Force
+    }
+  }
+}
+
 function Install-Extension {
   Require-Command "Invoke-WebRequest"
   Require-Command "Expand-Archive"
 
   New-Item -ItemType Directory -Path $ExtRoot -Force | Out-Null
   $tmpZip = Join-Path $env:TEMP "onui-extension-$Version.zip"
+  $extUrl = if ($BrowserTarget -eq "firefox") { $FirefoxExtUrl } else { $ChromiumExtUrl }
 
-  Write-Log "Downloading extension release artifact v$Version"
-  Invoke-WebRequest -Uri $ExtUrl -OutFile $tmpZip
+  Write-Log "Downloading $BrowserTarget extension release artifact v$Version"
+  Invoke-WebRequest -Uri $extUrl -OutFile $tmpZip
 
   if (Test-Path $ExtDir) {
     Remove-Item -Path $ExtDir -Recurse -Force
@@ -160,11 +217,24 @@ function Install-Mcp {
 function Print-FinalSteps {
   Write-Host ""
   Write-Host "Final browser step (still required):"
-  Write-Host "1) Open edge://extensions or chrome://extensions"
-  Write-Host "2) Enable Developer mode"
-  Write-Host "3) Click Load unpacked"
-  Write-Host "4) Select: $CurrentDir"
+  if ($BrowserTarget -eq "firefox") {
+    Write-Host "1) Open about:debugging#/runtime/this-firefox"
+    Write-Host "2) Click Load Temporary Add-on..."
+    Write-Host "3) Select: $CurrentDir\manifest.json"
+  } else {
+    Write-Host "1) Open edge://extensions or chrome://extensions"
+    Write-Host "2) Enable Developer mode"
+    Write-Host "3) Click Load unpacked"
+    Write-Host "4) Select: $CurrentDir"
+  }
   Write-Host ""
+  if ($BrowserTarget -eq "firefox") {
+    try {
+      Start-Process "firefox.exe" "about:debugging#/runtime/this-firefox" | Out-Null
+    } catch {
+    }
+    return
+  }
   try {
     Start-Process "msedge.exe" "edge://extensions" | Out-Null
   } catch {
@@ -175,6 +245,7 @@ function Print-FinalSteps {
   }
 }
 
+Migrate-LegacyInstallHome
 Install-Extension
 
 if (Should-InstallMcp) {

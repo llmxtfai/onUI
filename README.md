@@ -1,7 +1,7 @@
 # onUI
 ### Annotate Any UI for AI Agents
 
-Lightweight Chromium extension (Chrome + Edge) + local MCP bridge for annotation-first UI pair programming.
+Lightweight browser extension (Chrome + Edge + Firefox) + local MCP bridge for annotation-first UI pair programming.
 
 Powered by [onLLM.dev](https://onllm.dev).
 
@@ -9,6 +9,7 @@ Powered by [onLLM.dev](https://onllm.dev).
 [![GitHub license](https://img.shields.io/github/license/onllm-dev/onUI?style=for-the-badge)](https://github.com/onllm-dev/onUI/blob/main/LICENSE)
 [![Chrome Stable](https://img.shields.io/badge/Browser-Chrome_Stable-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white)](https://www.google.com/chrome/)
 [![Edge Stable](https://img.shields.io/badge/Browser-Edge_Stable-0A66C2?style=for-the-badge&logo=microsoftedge&logoColor=white)](https://www.microsoft.com/edge)
+[![Firefox Stable](https://img.shields.io/badge/Browser-Firefox_Stable-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white)](https://www.mozilla.org/firefox/)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy_Me_A_Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/tushar_s)
 
 > [!NOTE]
@@ -27,6 +28,8 @@ Powered by [onLLM.dev](https://onllm.dev).
 - 🧩 No integration into app code
 - 🎛️ Per-tab ON/OFF control (off by default)
 - 🎯 In-page annotation dialog with intent + severity
+- ✍️ Draw mode for region annotations (rectangle + ellipse)
+- ⚙️ Compact toolbar with pop-out settings (output level + clear on copy)
 - 👀 Visual markers and hover targeting
 - 🧾 Export outputs in compact / standard / detailed / forensic formats
 - 🛡️ Shadow DOM isolation for stable styling
@@ -47,9 +50,19 @@ macOS/Linux:
 curl -fsSL https://github.com/onllm-dev/onUI/releases/latest/download/install.sh | bash
 ```
 
+macOS/Linux (Firefox artifact):
+```bash
+curl -fsSL https://github.com/onllm-dev/onUI/releases/latest/download/install.sh | bash -s -- --firefox
+```
+
 Windows (PowerShell):
 ```powershell
 irm https://github.com/onllm-dev/onUI/releases/latest/download/install.ps1 | iex
+```
+
+Windows (PowerShell, Firefox artifact):
+```powershell
+iwr https://github.com/onllm-dev/onUI/releases/latest/download/install.ps1 -OutFile install.ps1; .\install.ps1 -Firefox
 ```
 
 The installer handles extension install and can set up MCP in the same run.
@@ -60,20 +73,30 @@ Then load it in Chrome or Edge:
 1. Open `chrome://extensions` or `edge://extensions`
 2. Enable **Developer mode**
 3. Click **Load unpacked**
-4. Select `~/onUI/extensions/current` (or `%USERPROFILE%\onUI\extensions\current` on Windows)
+4. Select `~/.onui/extensions/current` (or `%USERPROFILE%\.onui\extensions\current` on Windows)
 
 > Chromium browsers require this final manual step for unpacked extensions.
+
+Firefox (manual from release artifact):
+
+1. Download `onui-firefox-add-ons-vX.Y.Z.zip` from the GitHub release page.
+2. Extract it to a local folder.
+3. Open `about:debugging#/runtime/this-firefox`.
+4. Click **Load Temporary Add-on...**
+5. Select the extracted `manifest.json`.
 
 ## 🧠 Usage
 
 1. Open any supported website tab.
 2. Click the onUI extension icon.
 3. Enable `This Tab`.
-4. Use the on-page launcher to annotate and manage notes.
-5. Hold `Shift` and click multiple elements to batch-select targets.
-6. Release `Shift` to open a shared annotation dialog for selected targets.
-7. Save once to create one annotation per selected element.
-8. Copy exported output from the toolbar.
+4. Use the on-page launcher to open the compact toolbar.
+5. Toggle **Annotate mode** for element targeting or **Draw mode** for region targeting.
+6. Hold `Shift` and click multiple elements to batch-select targets.
+7. Release `Shift` to open a shared annotation dialog for selected targets.
+8. Save once to create one annotation per selected element (or one region annotation in draw flow).
+9. Open toolbar **Settings** to choose output level and configure **Clear on copy**.
+10. Copy exported output from the toolbar.
 
 ## 🔌 Local MCP Setup
 
@@ -154,7 +177,7 @@ Setup/verification notes:
 - Run `pnpm doctor:mcp` after wiring config to confirm local setup health.
 
 - Auto-registers `onui-local` for Claude Code and Codex when those CLIs are installed.
-- Browser support in this release: **Chrome stable + Edge stable (unpacked)**.
+- Browser support in this release: **Chrome stable + Edge stable + Firefox stable (unpacked)**.
 - `@onui/mcp-server` is workspace-local (`private: true`), so run setup/doctor from this repo.
 
 See:
@@ -183,10 +206,11 @@ Artifacts:
 1. `onui-extension-unpacked-vX.Y.Z.zip`
 2. `onui-chrome-web-store-vX.Y.Z.zip` (manifest `key` stripped for CWS)
 3. `onui-edge-add-ons-vX.Y.Z.zip` (manifest `key` stripped for Edge Add-ons)
-4. `onui-mcp-bundle-vX.Y.Z.zip`
-5. `install.sh`
-6. `install.ps1`
-7. `checksums.txt`
+4. `onui-firefox-add-ons-vX.Y.Z.zip`
+5. `onui-mcp-bundle-vX.Y.Z.zip`
+6. `install.sh`
+7. `install.ps1`
+8. `checksums.txt`
 
 ### Local release + GitHub publish
 
@@ -220,7 +244,7 @@ pnpm test:coverage
 ```text
 packages/
   core/        Shared annotation/report types + formatters
-  extension/   Chromium extension runtime (background/content/popup)
+  extension/   Browser extension runtime (background/content/popup)
   mcp-server/  Local MCP server + native bridge setup/doctor tooling
 ```
 

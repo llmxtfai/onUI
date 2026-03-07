@@ -1,4 +1,5 @@
 import type { Message, MessageResponse } from '@/types';
+import { webext } from '@/shared/webext';
 import { annotationManager } from './annotations';
 import { getNativeSyncStatus } from './native-sync';
 import { storageService } from './storage';
@@ -15,7 +16,7 @@ function isInjectableTabUrl(url?: string): boolean {
 
 async function isContentScriptBootstrapped(tabId: number): Promise<boolean> {
   try {
-    const results = await chrome.scripting.executeScript({
+    const results = await webext.scripting.executeScript({
       target: { tabId },
       func: () =>
         (globalThis as { __ONUI_CONTENT_BOOTSTRAPPED__?: boolean }).__ONUI_CONTENT_BOOTSTRAPPED__ ===
@@ -29,7 +30,7 @@ async function isContentScriptBootstrapped(tabId: number): Promise<boolean> {
 
 async function isContentScriptReachable(tabId: number): Promise<boolean> {
   try {
-    const response = await chrome.tabs.sendMessage(tabId, {
+    const response = await webext.tabs.sendMessage(tabId, {
       type: CONTENT_SCRIPT_PING_MESSAGE,
     } as { type: string });
     return Boolean((response as { ok?: boolean } | undefined)?.ok);
@@ -57,7 +58,7 @@ async function runWithInjectionLock(tabId: number, task: () => Promise<void>): P
 }
 
 async function ensureContentScriptInjected(tabId: number): Promise<void> {
-  const tab = await chrome.tabs.get(tabId);
+  const tab = await webext.tabs.get(tabId);
   if (!isInjectableTabUrl(tab.url)) {
     throw new Error('onUI can only run on http/https pages.');
   }
@@ -76,7 +77,7 @@ async function ensureContentScriptInjected(tabId: number): Promise<void> {
     }
 
     // Inject content script only after explicit user action.
-    await chrome.scripting.executeScript({
+    await webext.scripting.executeScript({
       target: { tabId },
       files: [CONTENT_SCRIPT_ENTRY_FILE],
     });
@@ -108,13 +109,13 @@ async function notifyTabRuntimeStateChanged(tabId: number): Promise<void> {
   };
 
   try {
-    await chrome.tabs.sendMessage(tabId, payload);
+    await webext.tabs.sendMessage(tabId, payload);
   } catch {
     // Content script may not be available for this tab URL; ignore.
   }
 
   try {
-    await chrome.runtime.sendMessage(payload);
+    await webext.runtime.sendMessage(payload);
   } catch {
     // Popup/extension page listeners may not exist; ignore.
   }
@@ -139,14 +140,14 @@ function sanitizeUrlForLog(url?: string): string | undefined {
  * even if the service worker becomes inactive (Manifest V3 limitation)
  */
 export function setupMessageHandler(): void {
-  chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  webext.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     if (changeInfo.status !== 'complete') {
       return;
     }
     void reInjectContentScriptIfEnabled(tabId, tab.url);
   });
 
-  chrome.runtime.onMessage.addListener(
+  webext.runtime.onMessage.addListener(
     (
       message: Message,
       sender: chrome.runtime.MessageSender,
